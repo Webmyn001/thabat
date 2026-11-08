@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { store } from '../data/store.js';
 import { JWT_SECRET, authenticateToken } from '../middleware/auth.js';
+import { sendVerificationOtpEmail } from '../utils/emailService.js';
 
 const router = express.Router();
 
@@ -13,7 +14,7 @@ function generateOtp() {
 
 // POST /api/auth/register
 // Password removed. User registers with Full Name, Email, Phone, Start Date, and Hifz declaration.
-// Generates 6-digit OTP code to verify email.
+// Generates 6-digit OTP code to verify email via Resend.
 router.post('/register', async (req, res) => {
   try {
     const { fullName, email, phone, hifzDeclarationAccepted, preferredLanguage, startDate } = req.body;
@@ -44,7 +45,13 @@ router.post('/register', async (req, res) => {
         createdAt: new Date().toISOString()
       });
 
-      console.log(`\n========================================\n[THABĀT AUTH] Verification code for ${cleanEmail}: ${otp}\n========================================\n`);
+      // Dispatch real email via Resend (with dev fallback)
+      await sendVerificationOtpEmail({
+        toEmail: cleanEmail,
+        fullName: user.fullName,
+        otpCode: otp,
+        language: user.preferredLanguage || preferredLanguage || 'en'
+      });
 
       return res.json({
         message: "You already have a verified account. A verification code has been sent to your email to log in.",
@@ -96,7 +103,13 @@ router.post('/register', async (req, res) => {
       createdAt: new Date().toISOString()
     });
 
-    console.log(`\n========================================\n[THABĀT AUTH] Registration OTP for ${cleanEmail}: ${otp}\n========================================\n`);
+    // Dispatch real email via Resend (with dev fallback)
+    await sendVerificationOtpEmail({
+      toEmail: cleanEmail,
+      fullName: cleanName,
+      otpCode: otp,
+      language: preferredLanguage || 'en'
+    });
 
     return res.status(200).json({
       message: "Registration initiated! Please enter the 6-digit verification code sent to your email.",
@@ -112,7 +125,7 @@ router.post('/register', async (req, res) => {
 
 // POST /api/auth/login
 // Password removed. User requests access using Full Name and Email.
-// Issues a 6-digit OTP code to verify their email identity.
+// Issues a 6-digit OTP code to verify their email identity via Resend.
 router.post('/login', async (req, res) => {
   try {
     const { fullName, email } = req.body;
@@ -144,7 +157,13 @@ router.post('/login', async (req, res) => {
       createdAt: new Date().toISOString()
     });
 
-    console.log(`\n========================================\n[THABĀT AUTH] Login OTP for ${cleanEmail}: ${otp}\n========================================\n`);
+    // Dispatch real email via Resend (with dev fallback)
+    await sendVerificationOtpEmail({
+      toEmail: cleanEmail,
+      fullName: user.fullName,
+      otpCode: otp,
+      language: user.preferredLanguage || 'en'
+    });
 
     return res.json({
       message: "Verification code sent to your email.",
@@ -210,11 +229,11 @@ router.post('/verify-otp', async (req, res) => {
       });
     }
 
-    // Generate JWT token
+    // Generate JWT token (90-day persistent session for Option B)
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
       JWT_SECRET,
-      { expiresIn: '30d' }
+      { expiresIn: '90d' }
     );
 
     const { passwordHash: _, ...safeUser } = user;
@@ -247,7 +266,13 @@ router.post('/resend-otp', async (req, res) => {
       createdAt: new Date().toISOString()
     });
 
-    console.log(`\n========================================\n[THABĀT AUTH] Resent OTP for ${cleanEmail}: ${otp}\n========================================\n`);
+    // Dispatch real email via Resend (with dev fallback)
+    await sendVerificationOtpEmail({
+      toEmail: cleanEmail,
+      fullName: user.fullName,
+      otpCode: otp,
+      language: user.preferredLanguage || 'en'
+    });
 
     return res.json({
       message: "A new verification code has been generated and sent to your email.",

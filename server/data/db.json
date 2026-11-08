@@ -37,6 +37,18 @@
       "createdAt": "2026-11-08T15:24:45.109Z",
       "emailVerifiedAt": "2026-11-08T15:24:54.744Z",
       "updatedAt": "2026-11-08T15:25:12.037Z"
+    },
+    {
+      "id": "1794152421105_fozce",
+      "fullName": "Test Hafidh",
+      "email": "testhafidh@example.com",
+      "phone": "",
+      "role": "participant",
+      "isEmailVerified": false,
+      "hifzDeclarationAccepted": true,
+      "hifzDeclarationAcceptedAt": "2026-11-08T15:40:21.098Z",
+      "preferredLanguage": "en",
+      "createdAt": "2026-11-08T15:40:21.105Z"
     }
   ],
   "enrolments": [
@@ -66,6 +78,15 @@
       "currentPhase": 1,
       "isCompleted": false,
       "createdAt": "2026-11-08T15:24:45.113Z"
+    },
+    {
+      "id": "1794152421108_64mct",
+      "userId": "1794152421105_fozce",
+      "startDate": "2026-11-08",
+      "currentProgramDay": 1,
+      "currentPhase": 1,
+      "isCompleted": false,
+      "createdAt": "2026-11-08T15:40:21.108Z"
     }
   ],
   "sessionLogs": [
@@ -1904,6 +1925,13 @@
       "code": "178412",
       "expiresAt": 1794152412040,
       "createdAt": "2026-11-08T15:25:12.040Z"
+    },
+    {
+      "id": "1794152421110_o4ohr",
+      "email": "testhafidh@example.com",
+      "code": "555286",
+      "expiresAt": 1794153321110,
+      "createdAt": "2026-11-08T15:40:21.110Z"
     }
   ],
   "settings": {
