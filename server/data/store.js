@@ -2,13 +2,22 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
+import mongoose from 'mongoose';
 import { INITIAL_INSPIRATIONS } from './initialInspirations.js';
+import { User } from '../models/User.js';
+import { Enrolment } from '../models/Enrolment.js';
+import { SessionLog } from '../models/SessionLog.js';
+import { Inspiration } from '../models/Inspiration.js';
+import { Certificate } from '../models/Certificate.js';
+import { Setting } from '../models/Setting.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DB_FILE = path.join(__dirname, 'db.json');
 
-// In-memory cache synced with db.json
+let isMongoConnected = false;
+
+// In-memory cache synced with db.json and MongoDB
 let database = {
   users: [],
   enrolments: [],
@@ -33,9 +42,10 @@ let database = {
   auditLogs: []
 };
 
-// Initialize or load db.json
-export function initStore() {
+// Initialize store (db.json + MongoDB Atlas if configured)
+export async function initStore() {
   try {
+    // 1. Initial local load from db.json
     if (!fs.existsSync(path.dirname(DB_FILE))) {
       fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
     }
@@ -51,18 +61,92 @@ export function initStore() {
       saveStore();
     }
 
-    // Ensure inspirations are seeded if empty
     if (!database.inspirations || database.inspirations.length < 180) {
       database.inspirations = [...INITIAL_INSPIRATIONS];
       saveStore();
     }
 
-    // Ensure initial admin exists
     ensureAdminUser();
+
+    // 2. Connect to MongoDB Atlas if URI is present
+    const mongoUri = process.env.MONGODB_URI;
+    if (mongoUri && (mongoUri.startsWith('mongodb://') || mongoUri.startsWith('mongodb+srv://'))) {
+      try {
+        await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 8000 });
+        isMongoConnected = true;
+        console.log(`✔ [Database] Successfully connected to MongoDB Atlas`);
+
+        // Sync from MongoDB Atlas into memory
+        await syncFromMongo();
+      } catch (mongoErr) {
+        console.warn(`⚠ [Database] MongoDB connection failed (${mongoErr.message}). Using local store fallback.`);
+      }
+    }
   } catch (err) {
     console.error("Error initializing store:", err);
     seedDefaultData();
     saveStore();
+  }
+}
+
+async function syncFromMongo() {
+  try {
+    const mongoUsers = await User.find().lean();
+    if (mongoUsers.length > 0) {
+      database.users = mongoUsers.map(u => ({ ...u, id: u.id || u._id.toString() }));
+    } else if (database.users.length > 0) {
+      // Seed initial users into Mongo
+      for (const u of database.users) {
+        await User.findOneAndUpdate({ email: u.email }, u, { upsert: true });
+      }
+    }
+
+    const mongoEnrolments = await Enrolment.find().lean();
+    if (mongoEnrolments.length > 0) {
+      database.enrolments = mongoEnrolments;
+    } else if (database.enrolments.length > 0) {
+      for (const e of database.enrolments) {
+        await Enrolment.findOneAndUpdate({ userId: e.userId }, e, { upsert: true });
+      }
+    }
+
+    const mongoLogs = await SessionLog.find().lean();
+    if (mongoLogs.length > 0) {
+      database.sessionLogs = mongoLogs;
+    } else if (database.sessionLogs.length > 0) {
+      for (const s of database.sessionLogs) {
+        await SessionLog.findOneAndUpdate({ userId: s.userId, sessionId: s.sessionId }, s, { upsert: true });
+      }
+    }
+
+    const mongoInspirations = await Inspiration.find().lean();
+    if (mongoInspirations.length > 0) {
+      database.inspirations = mongoInspirations;
+    } else if (database.inspirations.length > 0) {
+      for (const i of database.inspirations) {
+        await Inspiration.findOneAndUpdate({ day: i.day }, i, { upsert: true });
+      }
+    }
+
+    const mongoCerts = await Certificate.find().lean();
+    if (mongoCerts.length > 0) {
+      database.certificates = mongoCerts;
+    } else if (database.certificates.length > 0) {
+      for (const c of database.certificates) {
+        await Certificate.findOneAndUpdate({ certificateNumber: c.certificateNumber }, c, { upsert: true });
+      }
+    }
+
+    const mongoSetting = await Setting.findOne().lean();
+    if (mongoSetting) {
+      database.settings = { ...database.settings, ...mongoSetting };
+    } else if (database.settings) {
+      await Setting.findOneAndUpdate({}, database.settings, { upsert: true });
+    }
+
+    console.log(`✔ [Database] Synced collections with MongoDB Atlas (Users: ${database.users.length}, Enrolments: ${database.enrolments.length})`);
+  } catch (err) {
+    console.error("Error syncing with MongoDB:", err.message);
   }
 }
 
@@ -117,7 +201,7 @@ export function saveStore() {
   }
 }
 
-// Store accessor methods
+// Store accessor methods (Synchronous in-memory + async MongoDB persistence)
 export const store = {
   get: (collection) => database[collection] || [],
   
@@ -137,6 +221,20 @@ export const store = {
     const newItem = { id: item.id || `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`, ...item };
     database[collection].push(newItem);
     saveStore();
+
+    // Async MongoDB persistence
+    if (isMongoConnected) {
+      if (collection === 'users') {
+        User.findOneAndUpdate({ email: newItem.email.toLowerCase() }, newItem, { upsert: true }).catch(() => {});
+      } else if (collection === 'enrolments') {
+        Enrolment.findOneAndUpdate({ userId: newItem.userId }, newItem, { upsert: true }).catch(() => {});
+      } else if (collection === 'sessionLogs') {
+        SessionLog.findOneAndUpdate({ userId: newItem.userId, sessionId: newItem.sessionId }, newItem, { upsert: true }).catch(() => {});
+      } else if (collection === 'certificates') {
+        Certificate.findOneAndUpdate({ certificateNumber: newItem.certificateNumber }, newItem, { upsert: true }).catch(() => {});
+      }
+    }
+
     return newItem;
   },
 
@@ -146,6 +244,19 @@ export const store = {
     if (index !== -1) {
       list[index] = { ...list[index], ...updates, updatedAt: new Date().toISOString() };
       saveStore();
+
+      // Async MongoDB persistence
+      if (isMongoConnected) {
+        const item = list[index];
+        if (collection === 'users' && item.email) {
+          User.findOneAndUpdate({ email: item.email.toLowerCase() }, item, { upsert: true }).catch(() => {});
+        } else if (collection === 'enrolments' && item.userId) {
+          Enrolment.findOneAndUpdate({ userId: item.userId }, item, { upsert: true }).catch(() => {});
+        } else if (collection === 'sessionLogs' && item.sessionId) {
+          SessionLog.findOneAndUpdate({ userId: item.userId, sessionId: item.sessionId }, item, { upsert: true }).catch(() => {});
+        }
+      }
+
       return list[index];
     }
     return null;
@@ -164,6 +275,9 @@ export const store = {
   updateSettings: (newSettings) => {
     database.settings = { ...database.settings, ...newSettings };
     saveStore();
+    if (isMongoConnected) {
+      Setting.findOneAndUpdate({}, database.settings, { upsert: true }).catch(() => {});
+    }
     return database.settings;
   },
 

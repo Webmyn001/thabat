@@ -23,3 +23,5 @@ services:
         value: "THABĀT | ثبات <bellomuhyideen0001@gmail.com>"
       - key: JWT_SECRET
         generateValue: true
+      - key: MONGODB_URI
+        sync: false
