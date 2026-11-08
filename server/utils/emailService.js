@@ -1,8 +1,9 @@
 /**
- * THABĀT — Email Service via Resend
+ * THABĀT — Email Service (Brevo SMTP via Nodemailer + Resend Fallback)
  * Sends branded, bilingual 6-digit verification codes to participants.
  */
 
+import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -12,9 +13,33 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
+// 1. Initialize Brevo / SMTP Transporter
+let smtpTransporter = null;
+const brevoKey = process.env.BREVO_SMTP_KEY || process.env.SMTP_PASS;
+const brevoUser = process.env.BREVO_SMTP_USER || process.env.SMTP_USER;
+
+if (brevoKey && brevoUser) {
+  const host = process.env.BREVO_SMTP_HOST || process.env.SMTP_HOST || 'smtp-relay.brevo.com';
+  const port = parseInt(process.env.BREVO_SMTP_PORT || process.env.SMTP_PORT || '587', 10);
+  
+  smtpTransporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465, // true for 465, false for 587 (STARTTLS)
+    auth: {
+      user: brevoUser,
+      pass: brevoKey,
+    },
+  });
+
+  console.log(`✔ [Email Service] Initialized Brevo SMTP via ${host}:${port} (${brevoUser})`);
+}
+
+// 2. Initialize Resend Client (optional fallback)
 let resendClient = null;
 if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.startsWith('re_')) {
   resendClient = new Resend(process.env.RESEND_API_KEY);
+  console.log('✔ [Email Service] Initialized Resend fallback client');
 }
 
 /**
@@ -30,8 +55,11 @@ export async function sendVerificationOtpEmail({ toEmail, fullName, otpCode, lan
   const cleanEmail = toEmail.trim().toLowerCase();
   const cleanName = fullName ? fullName.trim() : 'Hafidh';
 
-  // Sender address: Use custom domain or Resend testing default
-  const fromEmail = process.env.EMAIL_FROM || 'THABĀT | ثبات <onboarding@resend.dev>';
+  // Sender address: Matches verified Brevo email or default
+  const defaultFrom = brevoUser 
+    ? `THABĀT | ثبات <${brevoUser}>` 
+    : 'THABĀT | ثبات <onboarding@resend.dev>';
+  const fromEmail = process.env.EMAIL_FROM || defaultFrom;
 
   const subject = isAr 
     ? `رمز التحقق الخاص بك لمنصة ثبات: ${otpCode}` 
@@ -142,7 +170,28 @@ export async function sendVerificationOtpEmail({ toEmail, fullName, otpCode, lan
   console.log(`[EMAIL DISPATCH] OTP Code: ${otpCode}`);
   console.log(`======================================================\n`);
 
-  // If Resend API Key is configured, send the real email!
+  // 1. Try Brevo SMTP first
+  if (smtpTransporter) {
+    try {
+      const info = await smtpTransporter.sendMail({
+        from: fromEmail,
+        to: cleanEmail,
+        subject,
+        html: htmlContent
+      });
+
+      console.log(`✔ [Brevo SMTP] Email successfully dispatched to ${cleanEmail}. Message ID: ${info.messageId}`);
+      return { success: true, id: info.messageId, provider: 'brevo' };
+    } catch (err) {
+      console.error(`✖ [Brevo SMTP Error] Failed to send email to ${cleanEmail}:`, err.message || err);
+      // If Resend is also available, try fallback; otherwise return fallbackCode
+      if (!resendClient) {
+        return { success: false, error: err.message, fallbackCode: otpCode };
+      }
+    }
+  }
+
+  // 2. Try Resend if configured
   if (resendClient) {
     try {
       const response = await resendClient.emails.send({
@@ -153,14 +202,14 @@ export async function sendVerificationOtpEmail({ toEmail, fullName, otpCode, lan
       });
 
       console.log(`✔ [Resend] Email successfully sent to ${cleanEmail}. Message ID:`, response.data?.id || response);
-      return { success: true, id: response.data?.id };
+      return { success: true, id: response.data?.id, provider: 'resend' };
     } catch (err) {
       console.error(`✖ [Resend Error] Failed to send email to ${cleanEmail}:`, err.message || err);
-      // Return simulated success so development / onboarding flow is never halted
       return { success: false, error: err.message, fallbackCode: otpCode };
     }
-  } else {
-    console.log(`ℹ [Resend] No RESEND_API_KEY found in .env. Code displayed above for instant testing.`);
-    return { success: true, simulated: true, fallbackCode: otpCode };
   }
+
+  // 3. Fallback: simulated mode
+  console.log(`ℹ [Email Service] No live SMTP or Resend credentials configured. Code displayed above for instant testing.`);
+  return { success: true, simulated: true, fallbackCode: otpCode };
 }
