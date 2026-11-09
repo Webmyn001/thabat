@@ -27,7 +27,7 @@ services:
         sync: false
 
   - type: web
-    name: thabat
+    name: thabat-prod
     runtime: static
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
