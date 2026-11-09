@@ -26,8 +26,9 @@ services:
       - key: MONGODB_URI
         sync: false
 
-  - type: static
+  - type: web
     name: thabat-frontend
+    runtime: static
     plan: free
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
