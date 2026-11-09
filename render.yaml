@@ -25,3 +25,18 @@ services:
         generateValue: true
       - key: MONGODB_URI
         sync: false
+
+  - type: static
+    name: thabat-frontend
+    plan: free
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        value: https://thabat-backend-f973.onrender.com/api
+      - key: VITE_APP_NAME
+        value: "THABĀT | ثبات"
