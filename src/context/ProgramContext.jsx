@@ -3,6 +3,7 @@ import { useAuth, API_BASE } from './AuthContext';
 import {
   CANONICAL_PROGRAM,
   ALL_SESSIONS_LIST,
+  addDays,
   formatDate,
   calculateScheduleMetrics
 } from '../utils/scheduleEngine.js';
@@ -94,12 +95,27 @@ export function ProgramProvider({ children }) {
 
   const activeDay = metrics.activeDay || CANONICAL_PROGRAM[0];
 
+  // A programme day is only unlocked once its calendar date has arrived.
+  // Day 1 falls on the enrolment start date, day 2 the next day, and so on.
+  const getDayScheduledDate = useCallback((dayNumber) => {
+    const safeDayNumber = Math.min(90, Math.max(1, Number(dayNumber) || 1));
+    return addDays(startDate, safeDayNumber - 1);
+  }, [startDate]);
+
+  const isDayUnlocked = useCallback((dayNumber) => {
+    return getDayScheduledDate(dayNumber) <= currentDateStr;
+  }, [getDayScheduledDate, currentDateStr]);
+
   // --- ACTIONS ---
 
   const markSessionComplete = async (dayNumber, sessionType, dateOverride) => {
-    // 1. Strict frontend constraint: "users should not be able to mark for the next day today, it should only be for that day"
-    if (dayNumber > activeDay.dayNumber) {
-      throw new Error("You cannot mark sessions for future programme days in advance.");
+    // Strict date-based constraint: a day cannot be marked before its
+    // scheduled calendar date, even if earlier days are already complete.
+    const scheduledDate = getDayScheduledDate(dayNumber);
+    if (scheduledDate > currentDateStr) {
+      throw new Error(
+        `This revision day is scheduled for ${scheduledDate}. You can only mark it on or after that date.`
+      );
     }
 
     const sessionId = sessionType === 'daily' ? `d${dayNumber}_daily` : `d${dayNumber}_${sessionType}`;
@@ -174,11 +190,10 @@ export function ProgramProvider({ children }) {
 
   const updateStartDate = async (newStartDate) => {
     if (!newStartDate) return;
-    setEnrolment(prev => ({ ...prev, startDate: newStartDate }));
 
     if (token) {
       try {
-        await fetch(`${API_BASE}/program/update-start-date`, {
+        const res = await fetch(`${API_BASE}/program/update-start-date`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -186,10 +201,18 @@ export function ProgramProvider({ children }) {
           },
           body: JSON.stringify({ startDate: newStartDate })
         });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || 'Failed to update the programme start date.');
+        }
+        setEnrolment(prev => ({ ...prev, startDate: newStartDate }));
         fetchProgramStatus();
       } catch (err) {
         console.error(err);
+        throw err;
       }
+    } else {
+      setEnrolment(prev => ({ ...prev, startDate: newStartDate }));
     }
   };
 
@@ -215,6 +238,9 @@ export function ProgramProvider({ children }) {
         currentDateStr,
         metrics,
         activeDay,
+        startDate,
+        getDayScheduledDate,
+        isDayUnlocked,
         dailyInspiration,
         markSessionComplete,
         undoSessionComplete,

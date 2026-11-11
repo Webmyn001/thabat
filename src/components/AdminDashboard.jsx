@@ -1,28 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, 
-  Users, 
-  Award, 
-  Sparkles, 
   Settings as SettingsIcon, 
   Search, 
   CheckCircle2, 
   AlertCircle, 
   Save, 
-  Download, 
   Plus, 
   Trash2, 
-  Edit3, 
-  Eye, 
-  Calendar,
-  X
+  Eye,
+  X,
+  AlertTriangle,
+  KeyRound,
+  ShieldAlert,
+  Mail,
+  Lock,
+  Check,
+  RefreshCw
 } from 'lucide-react';
 import { useAuth, API_BASE } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { formatDisplayDate, TOTAL_PROGRAM_SESSIONS } from '../utils/scheduleEngine.js';
 
-export default function AdminDashboard() {
-  const { token } = useAuth();
+export default function AdminDashboard({ setActiveTab }) {
+  const { token, currentUser, requestAdminPasswordOtp, changeAdminPassword, refreshUser } = useAuth();
   const { t, language } = useLanguage();
 
   const [activeAdminTab, setActiveAdminTab] = useState('overview'); // 'overview' | 'participants' | 'inspirations' | 'settings'
@@ -32,6 +33,21 @@ export default function AdminDashboard() {
   const [participants, setParticipants] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedParticipant, setSelectedParticipant] = useState(null);
+
+  // Participant deletion (requires explicit Yes/No confirmation)
+  const [participantToDelete, setParticipantToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [deleteNotice, setDeleteNotice] = useState('');
+
+  // Administrator password change via email OTP
+  const [pwOtpSent, setPwOtpSent] = useState(false);
+  const [pwOtp, setPwOtp] = useState('');
+  const [pwNew, setPwNew] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
+  const [pwStatus, setPwStatus] = useState('');
+  const [pwError, setPwError] = useState('');
+  const [pwLoading, setPwLoading] = useState(false);
 
   // Inspirations manager
   const [inspirations, setInspirations] = useState([]);
@@ -113,6 +129,90 @@ export default function AdminDashboard() {
     }
   };
 
+  // Refresh overview KPIs after destructive actions
+  const refreshOverview = () => {
+    if (!token) return;
+    fetch(`${API_BASE}/admin/overview`, { headers: { 'Authorization': `Bearer ${token}` } })
+      .then(r => r.json()).then(setOverview).catch(console.error);
+  };
+
+  // Delete participant after the admin explicitly confirms Yes
+  const handleDeleteParticipant = async () => {
+    if (!token || !participantToDelete) return;
+    setIsDeleting(true);
+    setDeleteError('');
+    try {
+      const res = await fetch(`${API_BASE}/admin/participants/${participantToDelete.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete participant.");
+      }
+
+      setParticipants(prev => prev.filter(p => p.id !== participantToDelete.id));
+      setSelectedParticipant(prev => (prev?.id === participantToDelete.id ? null : prev));
+      setDeleteNotice(data.message || `${participantToDelete.fullName} has been deleted.`);
+      setParticipantToDelete(null);
+      refreshOverview();
+      setTimeout(() => setDeleteNotice(''), 5000);
+    } catch (err) {
+      setDeleteError(err.message || "Failed to delete participant.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Request an administrator password-change OTP by email
+  const handleRequestPasswordOtp = async () => {
+    if (!currentUser?.email) return;
+    setPwLoading(true);
+    setPwError('');
+    setPwStatus('');
+    try {
+      const res = await requestAdminPasswordOtp(currentUser.email);
+      setPwOtpSent(true);
+      setPwStatus(res.message || "If this email belongs to an administrator, a password reset code has been sent.");
+    } catch (err) {
+      setPwError(err.message || "Failed to send password reset code.");
+    } finally {
+      setPwLoading(false);
+    }
+  };
+
+  // Change the administrator password using the emailed OTP
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPwError('');
+    setPwStatus('');
+
+    if (pwNew.length < 8) {
+      setPwError(language === 'ar' ? 'يجب أن تكون كلمة المرور 8 أحرف على الأقل.' : 'Password must be at least 8 characters long.');
+      return;
+    }
+    if (pwNew !== pwConfirm) {
+      setPwError(language === 'ar' ? 'كلمتا المرور غير متطابقتين.' : 'Passwords do not match.');
+      return;
+    }
+
+    setPwLoading(true);
+    try {
+      await changeAdminPassword({ otp: pwOtp, newPassword: pwNew });
+      setPwStatus(language === 'ar' ? 'تم تغيير كلمة المرور بنجاح.' : 'Password changed successfully.');
+      setPwOtpSent(false);
+      setPwOtp('');
+      setPwNew('');
+      setPwConfirm('');
+      setPwDevOtp('');
+      if (refreshUser) await refreshUser();
+    } catch (err) {
+      setPwError(err.message || "Failed to change password.");
+    } finally {
+      setPwLoading(false);
+    }
+  };
+
   // Filter participants
   const filteredParticipants = participants.filter(p => {
     if (!searchQuery.trim()) return true;
@@ -145,10 +245,10 @@ export default function AdminDashboard() {
         </div>
 
         {/* Admin Navigation Tabs */}
-        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl self-start sm:self-auto text-xs font-bold">
+        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl self-start sm:self-auto text-xs font-bold max-w-full overflow-x-auto no-scrollbar">
           <button
             onClick={() => setActiveAdminTab('overview')}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
+            className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg transition-all ${
               activeAdminTab === 'overview' ? 'bg-white dark:bg-emerald-700 text-slate-900 dark:text-white shadow-xs' : 'text-slate-500'
             }`}
           >
@@ -156,7 +256,7 @@ export default function AdminDashboard() {
           </button>
           <button
             onClick={() => setActiveAdminTab('participants')}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
+            className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg transition-all ${
               activeAdminTab === 'participants' ? 'bg-white dark:bg-emerald-700 text-slate-900 dark:text-white shadow-xs' : 'text-slate-500'
             }`}
           >
@@ -164,7 +264,7 @@ export default function AdminDashboard() {
           </button>
           <button
             onClick={() => setActiveAdminTab('inspirations')}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
+            className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg transition-all ${
               activeAdminTab === 'inspirations' ? 'bg-white dark:bg-emerald-700 text-slate-900 dark:text-white shadow-xs' : 'text-slate-500'
             }`}
           >
@@ -172,7 +272,7 @@ export default function AdminDashboard() {
           </button>
           <button
             onClick={() => setActiveAdminTab('settings')}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
+            className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg transition-all ${
               activeAdminTab === 'settings' ? 'bg-white dark:bg-emerald-700 text-slate-900 dark:text-white shadow-xs' : 'text-slate-500'
             }`}
           >
@@ -243,6 +343,26 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </div>
+
+            <div className="p-6 rounded-3xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 shadow-xs space-y-3 md:col-span-2">
+              <h3 className="text-base font-bold text-amber-900 dark:text-amber-200 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4" />
+                <span>{language === 'ar' ? 'معاينة شهادة المشرف' : 'Administrator Certificate Preview'}</span>
+              </h3>
+              <p className="text-xs text-amber-800/80 dark:text-amber-200/80 leading-relaxed">
+                {language === 'ar'
+                  ? 'يمكنك معاينة قالب الشهادة الرسمي من اليوم الأول لمعرفة كيف سيبدو. هذه المعاينة متاحة للمشرفين فقط، ولا تفتح الشهادة الحقيقية للمشاركين قبل إتمام جميع الأوراد الـ 180.'
+                  : 'Preview the official certificate template from Day 1 to see exactly how it looks. This preview is restricted to administrators and does not unlock real certificates for participants before all 180 sessions are complete.'}
+              </p>
+              <div className="pt-1">
+                <button
+                  onClick={() => setActiveTab && setActiveTab('certificate')}
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition-colors"
+                >
+                  {language === 'ar' ? 'فتح معاينة الشهادة' : 'Open Certificate Preview'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -266,6 +386,13 @@ export default function AdminDashboard() {
               />
             </div>
           </div>
+
+          {deleteNotice && (
+            <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-medium flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>{deleteNotice}</span>
+            </div>
+          )}
 
           <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -306,13 +433,22 @@ export default function AdminDashboard() {
                       {p.currentStreak}d
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <button
-                        onClick={() => setSelectedParticipant(p)}
-                        className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 hover:text-emerald-600 hover:bg-slate-100 transition-colors"
-                        title="Inspect participant profile"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => setSelectedParticipant(p)}
+                          className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 hover:text-emerald-600 hover:bg-slate-100 transition-colors"
+                          title="Inspect participant profile"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => { setDeleteError(''); setParticipantToDelete(p); }}
+                          className="p-1.5 rounded-lg border border-rose-200 dark:border-rose-900/60 text-rose-500 hover:text-white hover:bg-rose-600 hover:border-rose-600 transition-colors"
+                          title={language === 'ar' ? 'حذف المشارك' : 'Delete participant'}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -387,7 +523,8 @@ export default function AdminDashboard() {
 
       {/* TAB 4: Platform Settings */}
       {activeAdminTab === 'settings' && settings && (
-        <form onSubmit={handleSaveSettings} className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-6 max-w-3xl">
+        <div className="space-y-6 max-w-3xl">
+        <form onSubmit={handleSaveSettings} className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-6">
           <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <SettingsIcon className="w-5 h-5 text-emerald-600" />
             <span>Platform & Certificate Director Settings</span>
@@ -460,6 +597,141 @@ export default function AdminDashboard() {
             )}
           </div>
         </form>
+
+        {/* Administrator Account Security */}
+        <section className="p-6 sm:p-8 rounded-3xl bg-slate-900 border border-amber-500/20 shadow-xs space-y-4 text-slate-100">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <KeyRound className="w-5 h-5 text-amber-400" />
+                <span>{language === 'ar' ? 'أمان حساب المشرف' : 'Administrator Account Security'}</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                {language === 'ar'
+                  ? 'اطلب رمزاً لمرة واحدة على بريدك الإلكتروني، ثم عيّن كلمة مرور جديدة.'
+                  : 'Request a one-time code to your administrator email, then set a new password.'}
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-300 text-[10px] font-bold uppercase tracking-wider">
+              <ShieldAlert className="w-3 h-3" />
+              {language === 'ar' ? 'محمي' : 'Protected'}
+            </span>
+          </div>
+
+          <div className="p-3 rounded-xl bg-black/25 border border-slate-800 text-xs flex items-center gap-2">
+            <Mail className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="text-slate-300">{currentUser?.email}</span>
+          </div>
+
+          {currentUser?.mustChangePassword && (
+            <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-700 text-amber-200 text-xs flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>
+                {language === 'ar'
+                  ? 'ما زلت تستخدم كلمة المرور الأولية. يُنصح بتغييرها الآن.'
+                  : 'You are still using the initial seeded password. Please change it now.'}
+              </span>
+            </div>
+          )}
+
+          {pwError && (
+            <div className="p-3 rounded-xl bg-rose-950/50 border border-rose-800 text-rose-300 text-xs flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>{pwError}</span>
+            </div>
+          )}
+
+          {pwStatus && (
+            <div className="p-3 rounded-xl bg-emerald-950/50 border border-emerald-800 text-emerald-300 text-xs flex items-center gap-2">
+              <Check className="w-4 h-4 shrink-0" />
+              <span>{pwStatus}</span>
+            </div>
+          )}
+
+          {!pwOtpSent ? (
+            <button
+              type="button"
+              onClick={handleRequestPasswordOtp}
+              disabled={pwLoading}
+              className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors disabled:opacity-50"
+            >
+              <Mail className="w-4 h-4" />
+              <span>{pwLoading
+                ? (language === 'ar' ? 'جارٍ الإرسال...' : 'Sending...')
+                : (language === 'ar' ? 'إرسال رمز التحقق إلى بريدي' : 'Send OTP to My Email')}</span>
+            </button>
+          ) : (
+            <form onSubmit={handleChangePassword} className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">
+                    {language === 'ar' ? 'رمز البريد' : 'Email OTP'}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={pwOtp}
+                    onChange={(e) => setPwOtp(e.target.value.replace(/\D/g, ''))}
+                    placeholder="123456"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-700 bg-slate-800 text-white text-center font-mono tracking-widest text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">
+                    {language === 'ar' ? 'كلمة المرور الجديدة' : 'New Password'}
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={pwNew}
+                    onChange={(e) => setPwNew(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-700 bg-slate-800 text-white text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">
+                    {language === 'ar' ? 'تأكيد كلمة المرور' : 'Confirm Password'}
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={pwConfirm}
+                    onChange={(e) => setPwConfirm(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-700 bg-slate-800 text-white text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <button
+                  type="submit"
+                  disabled={pwLoading || pwOtp.length < 6}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition-colors disabled:opacity-50"
+                >
+                  <Lock className="w-4 h-4" />
+                  <span>{pwLoading
+                    ? (language === 'ar' ? 'جارٍ التحديث...' : 'Updating...')
+                    : (language === 'ar' ? 'تحديث كلمة المرور' : 'Update Password')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRequestPasswordOtp}
+                  disabled={pwLoading}
+                  className="px-3 py-2 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  {language === 'ar' ? 'إعادة إرسال الرمز' : 'Resend Code'}
+                </button>
+              </div>
+            </form>
+          )}
+        </section>
+        </div>
       )}
 
       {/* Add Inspiration Modal */}
@@ -546,6 +818,65 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Participant Deletion Confirmation (explicit Yes / No) */}
+      {participantToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 space-y-4 border border-rose-200 dark:border-rose-900/60 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-rose-100 dark:bg-rose-950/60 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  {language === 'ar' ? 'حذف المشارك نهائياً؟' : 'Delete this participant permanently?'}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                  {language === 'ar'
+                    ? 'سيتم حذف هذا المشارك وجميع سجلاته (التقدم، سجل المراجعة، والشهادات). لا يمكن التراجع عن هذا الإجراء.'
+                    : 'This will permanently remove the participant and all associated records (progress, revision history, and certificates). This action cannot be undone.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs space-y-1">
+              <div className="font-bold text-slate-900 dark:text-white">{participantToDelete.fullName}</div>
+              <div className="text-slate-500 dark:text-slate-400">{participantToDelete.email}</div>
+            </div>
+
+            {deleteError && (
+              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => { setParticipantToDelete(null); setDeleteError(''); }}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+              >
+                {language === 'ar' ? 'لا، الإبقاء على المشارك' : 'No, Keep Participant'}
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteParticipant}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>
+                  {isDeleting
+                    ? (language === 'ar' ? 'جارٍ الحذف...' : 'Deleting...')
+                    : (language === 'ar' ? 'نعم، حذف نهائي' : 'Yes, Delete Permanently')}
+                </span>
+              </button>
+            </div>
           </div>
         </div>
       )}

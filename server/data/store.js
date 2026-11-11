@@ -66,7 +66,9 @@ export async function initStore() {
       saveStore();
     }
 
-    ensureAdminUser();
+    // Seed the administrator account(s) from environment variables, never from
+    // hard-coded credentials in source control.
+    ensureAdminFromEnv();
 
     // 2. Connect to MongoDB Atlas if URI is present
     const mongoUri = process.env.MONGODB_URI;
@@ -78,6 +80,10 @@ export async function initStore() {
 
         // Sync from MongoDB Atlas into memory
         await syncFromMongo();
+
+        // Re-apply the environment administrator seed in case Mongo was empty
+        // or did not yet contain the configured administrator.
+        ensureAdminFromEnv();
       } catch (mongoErr) {
         console.warn(`⚠ [Database] MongoDB connection failed (${mongoErr.message}). Using local store fallback.`);
       }
@@ -151,79 +157,113 @@ async function syncFromMongo() {
 }
 
 function seedDefaultData() {
-  const salt = bcrypt.genSaltSync(10);
-  const adminPasswordHash = bcrypt.hashSync("Admin123!", salt);
-
-  database.users = [
-    {
-      id: "admin_1",
-      fullName: "Bello Muhyideen",
-      email: "admin@thabat.org",
-      phone: "+2349164028709",
-      passwordHash: adminPasswordHash,
-      role: "admin",
-      isEmailVerified: true,
-      hifzDeclarationAccepted: true,
-      hifzDeclarationAcceptedAt: new Date().toISOString(),
-      preferredLanguage: "en",
-      createdAt: new Date().toISOString()
-    },
-    {
-      id: "admin_2",
-      fullName: "Bello Muhyideen",
-      email: "bellomuhyideen0001@gmail.com",
-      phone: "+2349164028709",
-      passwordHash: adminPasswordHash,
-      role: "admin",
-      isEmailVerified: true,
-      hifzDeclarationAccepted: true,
-      hifzDeclarationAcceptedAt: new Date().toISOString(),
-      preferredLanguage: "en",
-      createdAt: new Date().toISOString()
-    }
-  ];
-
+  // Start with an empty participant directory. Administrator accounts are
+  // bootstrapped from environment variables by ensureAdminFromEnv().
+  database.users = [];
   database.inspirations = [...INITIAL_INSPIRATIONS];
 }
 
-function ensureAdminUser() {
-  const admins = [
-    { email: "admin@thabat.org", fullName: "Bello Muhyideen", phone: "+2349164028709" },
-    { email: "bellomuhyideen0001@gmail.com", fullName: "Bello Muhyideen", phone: "+2349164028709" }
-  ];
+/**
+ * Returns the administrator bootstrap configuration from the environment.
+ * Supported variables (server/.env):
+ *   ADMIN_EMAILS   Comma-separated administrator email addresses
+ *   ADMIN_EMAIL    Single administrator email (fallback)
+ *   ADMIN_PASSWORD Initial password used only when creating an account
+ *   ADMIN_NAME     Display name for newly created administrators
+ *   ADMIN_PHONE    Optional phone number
+ */
+function getAdminSeedConfig() {
+  const rawEmails = process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || '';
+  const emails = rawEmails
+    .split(',')
+    .map(email => email.trim().toLowerCase())
+    .filter(Boolean);
+
+  return {
+    emails,
+    password: process.env.ADMIN_PASSWORD || '',
+    name: (process.env.ADMIN_NAME || 'Administrator').trim(),
+    phone: (process.env.ADMIN_PHONE || '').trim()
+  };
+}
+
+/**
+ * Creates/promotes administrator accounts from environment configuration.
+ * Credentials are stored in the database (hashed) and are never hard-coded.
+ */
+function ensureAdminFromEnv() {
+  const { emails, password, name, phone } = getAdminSeedConfig();
+
+  if (emails.length === 0) {
+    console.warn('⚠ [Admin Seed] No ADMIN_EMAILS/ADMIN_EMAIL configured. Set an administrator in server/.env to bootstrap an admin account.');
+    return;
+  }
 
   let storeUpdated = false;
-  admins.forEach((adm, idx) => {
-    let existing = database.users.find(u => u.email === adm.email);
+
+  emails.forEach((email, idx) => {
+    const existing = database.users.find(u => u.email === email);
+
     if (!existing) {
-      const salt = bcrypt.genSaltSync(10);
-      const adminPasswordHash = bcrypt.hashSync("Admin123!", salt);
-      database.users.push({
-        id: `admin_${idx + 1}`,
-        fullName: adm.fullName,
-        email: adm.email,
-        phone: adm.phone,
-        passwordHash: adminPasswordHash,
+      if (!password) {
+        console.warn(`⚠ [Admin Seed] Cannot create ${email}: ADMIN_PASSWORD is not set.`);
+        return;
+      }
+
+      const passwordHash = bcrypt.hashSync(password, 10);
+      const newAdmin = {
+        id: `admin_${Date.now()}_${idx}`,
+        fullName: name,
+        email,
+        phone,
+        passwordHash,
         role: "admin",
         isEmailVerified: true,
+        emailVerifiedAt: new Date().toISOString(),
         hifzDeclarationAccepted: true,
         hifzDeclarationAcceptedAt: new Date().toISOString(),
         preferredLanguage: "en",
+        mustChangePassword: true,
         createdAt: new Date().toISOString()
-      });
+      };
+
+      database.users.push(newAdmin);
       storeUpdated = true;
-    } else {
-      if (existing.role !== 'admin') {
-        existing.role = 'admin';
-        storeUpdated = true;
+
+      if (isMongoConnected) {
+        User.findOneAndUpdate({ email }, newAdmin, { upsert: true }).catch(() => {});
       }
-      if (existing.phone !== adm.phone) {
-        existing.phone = adm.phone;
-        storeUpdated = true;
-      }
-      if (!existing.isEmailVerified) {
-        existing.isEmailVerified = true;
-        storeUpdated = true;
+
+      console.log(`✔ [Admin Seed] Created administrator account for ${email}`);
+      return;
+    }
+
+    let changed = false;
+    if (existing.role !== 'admin') {
+      existing.role = 'admin';
+      changed = true;
+    }
+    if (!existing.isEmailVerified) {
+      existing.isEmailVerified = true;
+      existing.emailVerifiedAt = existing.emailVerifiedAt || new Date().toISOString();
+      changed = true;
+    }
+    if (phone && !existing.phone) {
+      existing.phone = phone;
+      changed = true;
+    }
+    if (!existing.passwordHash && password) {
+      existing.passwordHash = bcrypt.hashSync(password, 10);
+      existing.mustChangePassword = true;
+      existing.passwordUpdatedAt = new Date().toISOString();
+      changed = true;
+      console.log(`✔ [Admin Seed] Added a password to existing administrator ${email}`);
+    }
+
+    if (changed) {
+      storeUpdated = true;
+      if (isMongoConnected) {
+        User.findOneAndUpdate({ email }, existing, { upsert: true }).catch(() => {});
       }
     }
   });
@@ -294,6 +334,8 @@ export const store = {
           Enrolment.findOneAndUpdate({ userId: item.userId }, item, { upsert: true }).catch(() => {});
         } else if (collection === 'sessionLogs' && item.sessionId) {
           SessionLog.findOneAndUpdate({ userId: item.userId, sessionId: item.sessionId }, item, { upsert: true }).catch(() => {});
+        } else if (collection === 'certificates' && item.certificateNumber) {
+          Certificate.findOneAndUpdate({ certificateNumber: item.certificateNumber }, item, { upsert: true }).catch(() => {});
         }
       }
 
@@ -304,11 +346,28 @@ export const store = {
 
   delete: (collection, predicate) => {
     const list = database[collection] || [];
-    const initialLen = list.length;
+    const removed = list.filter(predicate);
+    if (removed.length === 0) return false;
+
     database[collection] = list.filter(item => !predicate(item));
-    const deleted = initialLen !== database[collection].length;
-    if (deleted) saveStore();
-    return deleted;
+    saveStore();
+
+    // Keep MongoDB in sync when a record is removed.
+    if (isMongoConnected) {
+      removed.forEach(item => {
+        if (collection === 'users') {
+          User.deleteOne({ $or: [{ id: item.id }, { email: item.email }] }).catch(() => {});
+        } else if (collection === 'enrolments') {
+          Enrolment.deleteMany({ userId: item.userId }).catch(() => {});
+        } else if (collection === 'sessionLogs') {
+          SessionLog.deleteMany({ userId: item.userId }).catch(() => {});
+        } else if (collection === 'certificates') {
+          Certificate.deleteMany({ userId: item.userId }).catch(() => {});
+        }
+      });
+    }
+
+    return true;
   },
 
   getSettings: () => database.settings,

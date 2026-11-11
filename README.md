@@ -27,13 +27,40 @@
 
 ---
 
-## 🔒 Passwordless Authentication & Verified Email Identity
+## 🔒 Authentication: Participants & Administrators
 
-To remove barriers and enhance participant security:
+THABĀT uses two clearly separated sign-in experiences.
+
+### Participants — passwordless email OTP
 - **No passwords required.**
 - Participants identify themselves with **Full Name** and **Email Address**.
 - A secure 6-digit verification code (OTP) is sent to their email to authenticate and verify their identity.
 - Full RTL and Arabic support with solemn Hifz declaration upon registration.
+
+### Administrators — dedicated portal
+- A separate **Administrator Portal** (amber/dark restricted-access interface) is used for staff.
+- Administrators sign in with **email + password**. Participant OTP endpoints reject admin accounts, and the admin login endpoint rejects participant accounts.
+- Administrators can reset a forgotten password with an **emailed OTP**, and can change their password from the admin console.
+- Administrators can **preview the certificate template from Day 1**; this preview is admin-only and is never issued as a real certificate.
+- Administrators can **permanently delete a participant** (with an explicit Yes/No confirmation) and all associated progress records.
+- Administrator actions are recorded in the audit log.
+
+#### Bootstrapping the first administrator
+Administrators are seeded from environment variables on server start — credentials are never hard-coded in source. Add these to `server/.env`:
+
+```env
+ADMIN_EMAILS=admin@example.com,second-admin@example.com
+ADMIN_PASSWORD=ChangeThisToAStrongPassword123!
+ADMIN_NAME=Programme Administrator
+ADMIN_PHONE=
+```
+
+Notes:
+- `ADMIN_EMAILS` accepts a comma-separated list (or use `ADMIN_EMAIL` for a single address).
+- `ADMIN_PASSWORD` is hashed into the database and only used when creating an administrator or adding a missing password. It does **not** overwrite an existing password on restart.
+- Passwords must be at least **8 characters**.
+- Newly seeded administrators are flagged to change their initial password from the console.
+- The optional development-only participant OTP bypass (`777888`) requires `ALLOW_DEV_OTP_BYPASS=true` and is ignored when `NODE_ENV=production`.
 
 ---
 

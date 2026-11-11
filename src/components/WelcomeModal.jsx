@@ -5,12 +5,23 @@ import { formatDate } from '../utils/scheduleEngine';
 
 export default function WelcomeModal() {
   const { userProfile, programConfig, initializeProgram } = useProgram();
-  const [selectedDate, setSelectedDate] = useState(programConfig.startDate || formatDate(new Date()));
+  const todayStr = formatDate(new Date());
+  const [selectedDate, setSelectedDate] = useState(programConfig.startDate || todayStr);
+  const [dateError, setDateError] = useState('');
 
   if (programConfig.isInitialized) return null;
 
   const handleStart = (e) => {
     e.preventDefault();
+    if (!selectedDate) {
+      setDateError('Please choose a start date.');
+      return;
+    }
+    if (selectedDate < todayStr) {
+      setDateError('The programme start date cannot be earlier than today.');
+      return;
+    }
+    setDateError('');
     initializeProgram(selectedDate);
   };
 
@@ -102,14 +113,22 @@ export default function WelcomeModal() {
                   type="date"
                   id="startDate"
                   value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
+                  min={todayStr}
+                  onChange={(e) => {
+                    setSelectedDate(e.target.value);
+                    if (dateError) setDateError('');
+                  }}
                   className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none transition-all"
                   required
                 />
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
-                You can start today, pick an earlier date if you've already begun, or set an upcoming date.
-              </p>
+              {dateError ? (
+                <p className="text-xs text-rose-600 dark:text-rose-400 mt-1.5 font-medium">{dateError}</p>
+              ) : (
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
+                  You can start today or choose any upcoming date. Past dates cannot be selected.
+                </p>
+              )}
             </div>
 
             <button

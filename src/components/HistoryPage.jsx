@@ -213,7 +213,7 @@ export default function HistoryPage() {
       {/* Calendar Grid View */}
       {viewMode === 'calendar' && (
         <div className="p-6 sm:p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-3">
               <CalendarIcon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
@@ -221,7 +221,7 @@ export default function HistoryPage() {
               </h2>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => setCurrentMonthDate(new Date(year, month - 1, 1))}
                 className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -246,11 +246,11 @@ export default function HistoryPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-2 mb-2 text-center text-xs font-bold text-slate-400 uppercase tracking-wider">
+          <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2 text-center text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">
             <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
           </div>
 
-          <div className="grid grid-cols-7 gap-2">
+          <div className="grid grid-cols-7 gap-1 sm:gap-2">
             {Array.from({ length: startOffset }).map((_, i) => (
               <div key={`empty-${i}`} className="h-16 sm:h-20 rounded-2xl bg-transparent" />
             ))}
@@ -266,20 +266,25 @@ export default function HistoryPage() {
                 <button
                   key={dateStr}
                   onClick={() => handleSelectDay(dateStr)}
-                  className={`h-16 sm:h-20 p-2 rounded-2xl border flex flex-col justify-between text-left rtl:text-right transition-all hover:scale-[1.02] cursor-pointer ${dayInfo.color}`}
+                  className={`h-14 sm:h-20 p-1.5 sm:p-2 rounded-xl sm:rounded-2xl border flex flex-col justify-between text-left rtl:text-right transition-all hover:scale-[1.02] cursor-pointer ${dayInfo.color}`}
                 >
-                  <div className="flex items-center justify-between w-full">
-                    <span className="text-sm font-extrabold">{dayNum}</span>
-                    {isToday && (
-                      <span className="text-[9px] uppercase font-bold tracking-tight px-1.5 py-0.5 rounded-full bg-emerald-700 text-white">
-                        Today
-                      </span>
-                    )}
-                    {hasNote && <span className="w-2 h-2 rounded-full bg-indigo-400" />}
+                  <div className="flex items-center justify-between w-full gap-1">
+                    <span className="text-xs sm:text-sm font-extrabold">{dayNum}</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {isToday && (
+                        <span className="hidden sm:inline text-[9px] uppercase font-bold tracking-tight px-1.5 py-0.5 rounded-full bg-emerald-700 text-white">
+                          Today
+                        </span>
+                      )}
+                      {hasNote && <span className="w-2 h-2 rounded-full bg-indigo-400" />}
+                    </div>
                   </div>
 
-                  <div className="text-[10px] truncate font-medium">
-                    {dayInfo.label}
+                  <div className="flex items-center gap-1 min-w-0">
+                    <span className={`sm:hidden w-2 h-2 rounded-full shrink-0 ${dayInfo.dot || 'bg-slate-300 dark:bg-slate-600'}`} />
+                    <span className="hidden sm:block text-[10px] truncate font-medium">
+                      {dayInfo.label}
+                    </span>
                   </div>
                 </button>
               );
@@ -317,7 +322,7 @@ export default function HistoryPage() {
                     </div>
                   </div>
 
-                  <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                  <span className="hidden sm:inline text-xs font-bold text-emerald-700 dark:text-emerald-400">
                     {statusInfo.label}
                   </span>
                 </div>

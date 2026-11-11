@@ -13,7 +13,7 @@ export default function FloatingWhatsApp() {
   const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(pretext)}`;
 
   return (
-    <aside aria-label="Support contacts" className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-50 flex items-center gap-2 pointer-events-auto select-none">
+    <aside aria-label="Support contacts" className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-30 flex items-center gap-2 pointer-events-auto select-none">
       {/* Tooltip on hover */}
       <div 
         className={`hidden sm:block px-3 py-1.5 rounded-xl bg-slate-900/90 dark:bg-white/90 text-white dark:text-slate-900 text-xs font-semibold shadow-lg backdrop-blur-xs transition-all duration-200 pointer-events-none ${

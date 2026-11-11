@@ -5,6 +5,7 @@ import {
   CANONICAL_PROGRAM, 
   ALL_SESSIONS_LIST, 
   calculateScheduleMetrics, 
+  addDays,
   formatDate 
 } from '../../src/utils/scheduleEngine.js';
 
@@ -74,21 +75,17 @@ router.post('/complete-session', authenticateToken, (req, res) => {
     }
 
     const enrolment = store.findOne('enrolments', e => e.userId === userId);
-    const userSessionLogs = store.find('sessionLogs', s => s.userId === userId);
-    const sessionsMap = {};
-    userSessionLogs.forEach(s => {
-      sessionsMap[s.sessionId] = { isCompleted: s.isCompleted, completedAt: s.completedAt };
-    });
 
     const todayDateStr = formatDate(new Date());
-    const currentMetrics = calculateScheduleMetrics(enrolment?.startDate, sessionsMap, todayDateStr);
 
-    // Rule: User cannot mark for next/future days in advance!
-    // The session must belong to the active programme day or earlier.
-    const activeDayNumber = currentMetrics.activeDay ? currentMetrics.activeDay.dayNumber : 1;
-    if (dayNumber > activeDayNumber) {
+    // Rule: a day's sessions unlock on that day's scheduled calendar date.
+    // Day 1 is the enrolment start date, day 2 the next day, and so on.
+    // This prevents marking tomorrow's task today even if today's work is done.
+    const startDateStr = enrolment?.startDate || todayDateStr;
+    const scheduledDate = addDays(startDateStr, Number(dayNumber) - 1);
+    if (scheduledDate > todayDateStr) {
       return res.status(403).json({ 
-        error: "You cannot mark sessions for future programme days in advance. Complete today's active assignments first." 
+        error: `This day is scheduled for ${scheduledDate}. You can only mark its sessions on or after that date.` 
       });
     }
 
@@ -99,7 +96,10 @@ router.post('/complete-session', authenticateToken, (req, res) => {
     }
 
     const now = new Date();
-    const effectiveDate = dateOverride || formatDate(now);
+    // Never record a completion date in the future.
+    const effectiveDate = dateOverride && dateOverride <= todayDateStr
+      ? dateOverride
+      : formatDate(now);
 
     if (existingLog) {
       store.update('sessionLogs', s => s.id === existingLog.id, {
@@ -195,6 +195,17 @@ router.post('/update-start-date', authenticateToken, (req, res) => {
 
     if (!startDate) {
       return res.status(400).json({ error: "Valid start date is required." });
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+      return res.status(400).json({ error: "Please provide a valid programme start date." });
+    }
+
+    const today = formatDate(new Date());
+    if (startDate < today) {
+      return res.status(400).json({
+        error: "The programme start date cannot be earlier than today."
+      });
     }
 
     store.update('enrolments', e => e.userId === userId, { startDate });

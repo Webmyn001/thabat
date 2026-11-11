@@ -110,7 +110,6 @@ export const TRANSLATIONS = {
     btnVerifyOtp: "Verify & Enter Dashboard",
     resendOtp: "Resend Code",
     otpSent: "Verification code sent to your email.",
-    devOtpNotice: "Verification Code: ",
     backToEdit: "Back to Edit Details",
     noPasswordNotice: "No password needed. Access is securely verified directly via your email.",
     
@@ -200,7 +199,15 @@ export const TRANSLATIONS = {
     supportPhone: "Direct Phone Call",
     supportAvailable: "Always available to assist participants for the sake of Allah.",
     whatsappSupportTooltip: "WhatsApp Support (+234 916 402 8709)",
-    whatsappPretext: "Assalamu Alaikum, I need support with the THABĀT Qur'an Revision Programme."
+    whatsappPretext: "Assalamu Alaikum, I need support with the THABĀT Qur'an Revision Programme.",
+
+    // Admin Auth
+    adminLoginTitle: "Administrator Console Login",
+    adminLoginDesc: "Sign in with your admin credentials to access the Thabāt administrative console.",
+    adminPurposeTitle: "Admin Access",
+    adminPurposeDesc: "Manage participants, review completion metrics, curate daily inspirations, and configure platform settings.",
+    switchToAdminLogin: "Administrator Portal Sign In",
+    switchToParticipantLogin: "Return to Participant Sign In"
   },
   
   ar: {
@@ -314,7 +321,6 @@ export const TRANSLATIONS = {
     btnVerifyOtp: "تحقق والدخول للمنصة",
     resendOtp: "إعادة إرسال الرمز",
     otpSent: "تم إرسال رمز التحقق إلى بريدك.",
-    devOtpNotice: "رمز التحقق: ",
     backToEdit: "الرجوع لتعديل البيانات",
     noPasswordNotice: "لا حاجة لكلمة مرور، يتم التحقق مباشرة عبر البريد الإلكتروني.",
     
@@ -404,6 +410,14 @@ export const TRANSLATIONS = {
     supportPhone: "الاتصال الهاتفي المباشر",
     supportAvailable: "في خدمتكم دائماً لتيسير رحلة تثبيت كتاب الله تعالى.",
     whatsappSupportTooltip: "الدعم عبر واتساب (+234 916 402 8709)",
-    whatsappPretext: "السلام عليكم ورحمة الله، أحتاج إلى مساعدة واستفسار بخصوص برنامج ثبات لمراجعة القرآن الكريم."
+    whatsappPretext: "السلام عليكم ورحمة الله، أحتاج إلى مساعدة واستفسار بخصوص برنامج ثبات لمراجعة القرآن الكريم.",
+
+    // Admin Auth
+    adminLoginTitle: "تسجيل دخول المشرف / الإدارة",
+    adminLoginDesc: "سجّل دخولك بحساب الإدارة للوصول إلى لوحة التحكم الإدارية لمنصة ثبات.",
+    adminPurposeTitle: "بوابة المشرفين",
+    adminPurposeDesc: "إدارة المشاركين، متابعة الإنجاز، تحديث التذكيرات اليومية، وضبط إعدادات المنصة.",
+    switchToAdminLogin: "دخول المشرفين والإدارة",
+    switchToParticipantLogin: "العودة لتسجيل دخول المشاركين"
   }
 };

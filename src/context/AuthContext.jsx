@@ -51,7 +51,7 @@ export function AuthProvider({ children }) {
       throw new Error(data.error || "Login request failed");
     }
 
-    return data; // { requiresOtp, email, devOtp, message }
+    return data; // { requiresOtp, email, message }
   };
 
   const register = async (userData) => {
@@ -66,7 +66,7 @@ export function AuthProvider({ children }) {
       throw new Error(data.error || "Registration failed");
     }
 
-    return data; // { requiresOtp, email, devOtp, message }
+    return data; // { requiresOtp, email, message }
   };
 
   const verifyOtp = async (email, otp) => {
@@ -99,6 +99,73 @@ export function AuthProvider({ children }) {
       throw new Error(data.error || "Failed to resend code");
     }
 
+    return data;
+  };
+
+  // Dedicated administrator sign-in (email + password)
+  const adminLogin = async (email, password) => {
+    const res = await fetch(`${API_BASE}/auth/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || "Administrator login failed");
+    }
+
+    setToken(data.token);
+    setCurrentUser(data.user);
+    localStorage.setItem('thabat_token', data.token);
+    return data.user;
+  };
+
+  // Request an administrator password-reset / change OTP by email
+  const requestAdminPasswordOtp = async (email) => {
+    const res = await fetch(`${API_BASE}/auth/admin/request-password-reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || "Failed to send administrator password reset code");
+    }
+    return data;
+  };
+
+  // Complete a forgotten-password reset using the emailed OTP
+  const resetAdminPassword = async (email, otp, newPassword) => {
+    const res = await fetch(`${API_BASE}/auth/admin/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, otp, newPassword })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || "Failed to reset administrator password");
+    }
+    return data;
+  };
+
+  // Change password from inside the authenticated admin console using an OTP
+  const changeAdminPassword = async ({ otp, newPassword, currentPassword }) => {
+    const res = await fetch(`${API_BASE}/auth/admin/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ otp, newPassword, currentPassword })
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || "Failed to change administrator password");
+    }
     return data;
   };
 
@@ -137,6 +204,10 @@ export function AuthProvider({ children }) {
         register,
         verifyOtp,
         resendOtp,
+        adminLogin,
+        requestAdminPasswordOtp,
+        resetAdminPassword,
+        changeAdminPassword,
         logout,
         refreshUser
       }}

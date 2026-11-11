@@ -3,15 +3,9 @@
  * Sends branded, bilingual 6-digit verification codes to participants.
  */
 
+import '../config/env.js';
 import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.join(__dirname, '../.env') });
 
 // 1. Initialize Brevo / SMTP Transporter
 let smtpTransporter = null;
@@ -43,15 +37,17 @@ if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.startsWith('re_')) 
 }
 
 /**
- * Sends a 6-digit OTP email to participant
+ * Sends a 6-digit OTP email. Also used for administrator password resets.
  * @param {Object} options
  * @param {string} options.toEmail
  * @param {string} options.fullName
  * @param {string} options.otpCode
  * @param {string} [options.language='en']
+ * @param {'verification'|'password_reset'} [options.purpose='verification']
  */
-export async function sendVerificationOtpEmail({ toEmail, fullName, otpCode, language = 'en' }) {
+export async function sendVerificationOtpEmail({ toEmail, fullName, otpCode, language = 'en', purpose = 'verification' }) {
   const isAr = language === 'ar';
+  const isPasswordReset = purpose === 'password_reset';
   const cleanEmail = toEmail.trim().toLowerCase();
   const cleanName = fullName ? fullName.trim() : 'Hafidh';
 
@@ -61,9 +57,13 @@ export async function sendVerificationOtpEmail({ toEmail, fullName, otpCode, lan
     : 'THABĀT | ثبات <onboarding@resend.dev>';
   const fromEmail = process.env.EMAIL_FROM || defaultFrom;
 
-  const subject = isAr 
-    ? `رمز التحقق الخاص بك لمنصة ثبات: ${otpCode}` 
-    : `Your THABĀT Verification Code: ${otpCode}`;
+  const subject = isPasswordReset
+    ? (isAr
+        ? `رمز إعادة تعيين كلمة مرور الإدارة في ثبات: ${otpCode}`
+        : `Your THABĀT Admin Password Reset Code: ${otpCode}`)
+    : (isAr
+        ? `رمز التحقق الخاص بك لمنصة ثبات: ${otpCode}`
+        : `Your THABĀT Verification Code: ${otpCode}`);
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -88,7 +88,9 @@ export async function sendVerificationOtpEmail({ toEmail, fullName, otpCode, lan
                 THABĀT | ثبات
               </div>
               <div style="font-size: 13px; color: #6ee7b7; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px;">
-                90-Day Qur'an Revision Programme
+                ${isPasswordReset
+                  ? (isAr ? 'إعادة تعيين كلمة مرور الإدارة' : 'Administrator Password Reset')
+                  : '90-Day Qur\'an Revision Programme'}
               </div>
               <div style="margin-top: 14px; font-size: 15px; color: #a7f3d0; font-family: 'Amiri', 'Traditional Arabic', serif;">
                 بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
@@ -104,9 +106,13 @@ export async function sendVerificationOtpEmail({ toEmail, fullName, otpCode, lan
               </p>
               
               <p style="font-size: 14px; line-height: 1.6; color: #475569; margin: 0 0 24px;">
-                ${isAr 
-                  ? 'أدخل رمز التحقق التالي لتأكيد بريدك الإلكتروني والبدء في برنامج المراجعة وتثبيت الحفظ (18 ختمة كاملة عبر 180 ورداً):' 
-                  : 'Enter the following 6-digit verification code to confirm your email and access your 90-day Qur’an revision trajectory (18 full Khatmahs across 180 sessions):'}
+                ${isPasswordReset
+                  ? (isAr
+                      ? 'استخدم رمز التحقق التالي لإعادة تعيين كلمة مرور حساب الإدارة الخاص بك. لا تشارك هذا الرمز مع أي شخص:'
+                      : 'Use the following 6-digit code to reset your administrator account password. Do not share this code with anyone:')
+                  : (isAr
+                      ? 'أدخل رمز التحقق التالي لتأكيد بريدك الإلكتروني والبدء في برنامج المراجعة وتثبيت الحفظ (18 ختمة كاملة عبر 180 ورداً):'
+                      : 'Enter the following 6-digit verification code to confirm your email and access your 90-day Qur’an revision trajectory (18 full Khatmahs across 180 sessions):')}
               </p>
 
               <!-- OTP Display Box -->
@@ -163,18 +169,15 @@ export async function sendVerificationOtpEmail({ toEmail, fullName, otpCode, lan
 </html>
   `;
 
-  // Always log to console for development verification
-  console.log(`\n======================================================`);
-  console.log(`[EMAIL DISPATCH] To: ${cleanEmail}`);
-  console.log(`[EMAIL DISPATCH] Subject: ${subject}`);
-  console.log(`[EMAIL DISPATCH] OTP Code: ${otpCode}`);
-  console.log(`======================================================\n`);
+  // Log the dispatch without exposing the OTP code in server logs.
+  console.log(`\n[EMAIL DISPATCH] To: ${cleanEmail} | Subject: ${subject}\n`);
 
   // 1. Try Brevo SMTP first
   if (smtpTransporter) {
     try {
       const info = await smtpTransporter.sendMail({
         from: fromEmail,
+        replyTo: fromEmail,
         to: cleanEmail,
         subject,
         html: htmlContent
@@ -184,9 +187,9 @@ export async function sendVerificationOtpEmail({ toEmail, fullName, otpCode, lan
       return { success: true, id: info.messageId, provider: 'brevo' };
     } catch (err) {
       console.error(`✖ [Brevo SMTP Error] Failed to send email to ${cleanEmail}:`, err.message || err);
-      // If Resend is also available, try fallback; otherwise return fallbackCode
+      // If Resend is also available, try fallback; otherwise report the failure.
       if (!resendClient) {
-        return { success: false, error: err.message, fallbackCode: otpCode };
+        return { success: false, error: err.message || 'Brevo SMTP delivery failed' };
       }
     }
   }
@@ -201,15 +204,36 @@ export async function sendVerificationOtpEmail({ toEmail, fullName, otpCode, lan
         html: htmlContent
       });
 
+      if (response?.error) {
+        console.error(`✖ [Resend Error] Failed to send email to ${cleanEmail}:`, response.error);
+        return { success: false, error: response.error.message || 'Resend delivery failed' };
+      }
+
       console.log(`✔ [Resend] Email successfully sent to ${cleanEmail}. Message ID:`, response.data?.id || response);
       return { success: true, id: response.data?.id, provider: 'resend' };
     } catch (err) {
       console.error(`✖ [Resend Error] Failed to send email to ${cleanEmail}:`, err.message || err);
-      return { success: false, error: err.message, fallbackCode: otpCode };
+      return { success: false, error: err.message || 'Resend delivery failed' };
     }
   }
 
-  // 3. Fallback: simulated mode
-  console.log(`ℹ [Email Service] No live SMTP or Resend credentials configured. Code displayed above for instant testing.`);
-  return { success: true, simulated: true, fallbackCode: otpCode };
+  // 3. No provider configured: this is a configuration error, not a success.
+  console.error('✖ [Email Service] No live SMTP or Resend credentials configured. Cannot deliver OTP email.');
+  return {
+    success: false,
+    error: 'No email provider is configured. Set BREVO_SMTP_* or RESEND_API_KEY in server/.env.'
+  };
+}
+
+/**
+ * Sends an administrator password-reset OTP.
+ */
+export async function sendPasswordResetOtpEmail({ toEmail, fullName, otpCode, language = 'en' }) {
+  return sendVerificationOtpEmail({
+    toEmail,
+    fullName,
+    otpCode,
+    language,
+    purpose: 'password_reset'
+  });
 }

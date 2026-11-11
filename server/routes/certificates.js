@@ -13,6 +13,12 @@ const router = express.Router();
 // GET /api/certificates/eligibility
 router.get('/eligibility', authenticateToken, (req, res) => {
   try {
+    if (req.user.role === 'admin') {
+      return res.status(403).json({
+        error: "Administrators use the administrator certificate preview."
+      });
+    }
+
     const userId = req.user.id;
     const enrolment = store.findOne('enrolments', e => e.userId === userId);
     const userSessionLogs = store.find('sessionLogs', s => s.userId === userId);
@@ -49,6 +55,12 @@ router.get('/eligibility', authenticateToken, (req, res) => {
 // POST /api/certificates/generate
 router.post('/generate', authenticateToken, (req, res) => {
   try {
+    if (req.user.role === 'admin') {
+      return res.status(403).json({
+        error: "Administrators use the administrator certificate preview."
+      });
+    }
+
     const userId = req.user.id;
     const user = store.findOne('users', u => u.id === userId);
     const enrolment = store.findOne('enrolments', e => e.userId === userId);

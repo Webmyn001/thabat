@@ -24,6 +24,7 @@ import {
   formatDisplayDate, 
   getJuzDetails, 
   CANONICAL_PROGRAM,
+  diffDays,
   formatDate
 } from '../utils/scheduleEngine.js';
 
@@ -34,6 +35,9 @@ export default function Dashboard({ setActiveTab }) {
     sessions, 
     metrics, 
     activeDay, 
+    startDate,
+    getDayScheduledDate,
+    isDayUnlocked,
     dailyInspiration, 
     markSessionComplete, 
     undoSessionComplete,
@@ -41,16 +45,24 @@ export default function Dashboard({ setActiveTab }) {
   } = useProgram();
 
   const [copiedQuote, setCopiedQuote] = useState(false);
-  const [viewedDayOffset, setViewedDayOffset] = useState(0); // 0 means activeDay
+  const [viewedDayOffset, setViewedDayOffset] = useState(0); // 0 means the current programme day
   const [actionError, setActionError] = useState('');
 
-  // Current day being inspected (defaults to activeDay from rolling schedule)
-  const currentDayIndex = activeDay ? activeDay.dayNumber - 1 : 0;
+  // Default to the earliest unfinished day, but if that day is still in the
+  // future, show today's scheduled day instead so we never present a locked
+  // next-day task as the active card.
+  const todayProgramDayNumber = Math.min(90, Math.max(1, diffDays(startDate, currentDateStr) + 1));
+  const defaultDayNumber = isDayUnlocked(activeDay?.dayNumber || 1)
+    ? (activeDay?.dayNumber || 1)
+    : todayProgramDayNumber;
+  const currentDayIndex = defaultDayNumber - 1;
   const targetIndex = Math.max(0, Math.min(89, currentDayIndex + viewedDayOffset));
   const displayedDay = CANONICAL_PROGRAM[targetIndex] || activeDay;
 
   const isLookingAtFutureOrPast = viewedDayOffset !== 0;
-  const isFutureDay = displayedDay.dayNumber > (activeDay ? activeDay.dayNumber : 1);
+  const isFutureDay = !isDayUnlocked(displayedDay.dayNumber);
+  const nextDayUnlocked = displayedDay.dayNumber < 90 && isDayUnlocked(displayedDay.dayNumber + 1);
+  const displayedDayDate = getDayScheduledDate(displayedDay.dayNumber);
 
   // Session status helpers for displayed day
   const getSessionState = (sessionId) => {
@@ -117,7 +129,7 @@ export default function Dashboard({ setActiveTab }) {
                 <span>{t('freeBadge')}</span>
               </div>
             </div>
-            <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white">
+            <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-white break-words">
               {t('greeting')}, {currentUser?.fullName}
             </h1>
             <p className="mt-2 text-emerald-100/90 text-xs sm:text-base max-w-2xl font-light leading-relaxed">
@@ -267,7 +279,7 @@ export default function Dashboard({ setActiveTab }) {
           </div>
 
           {/* Day switcher controls */}
-          <div className="flex items-center gap-2 self-start sm:self-auto">
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
             <button
               onClick={() => setViewedDayOffset(prev => Math.max(-(currentDayIndex), prev - 1))}
               disabled={displayedDay.dayNumber <= 1}
@@ -288,8 +300,10 @@ export default function Dashboard({ setActiveTab }) {
 
             <button
               onClick={() => setViewedDayOffset(prev => Math.min(89 - currentDayIndex, prev + 1))}
-              disabled={displayedDay.dayNumber >= 90}
-              title="Next Day"
+              disabled={!nextDayUnlocked}
+              title={nextDayUnlocked
+                ? "Next Day"
+                : `${language === 'ar' ? 'يفتح في' : 'Unlocks on'} ${formatDisplayDate(getDayScheduledDate(displayedDay.dayNumber + 1), language)}`}
               className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none text-slate-700 dark:text-slate-200 transition-colors"
             >
               <ChevronRight className="w-4 h-4 rtl:rotate-180" />
@@ -362,7 +376,11 @@ export default function Dashboard({ setActiveTab }) {
         {isFutureDay && (
           <div className="mb-6 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-semibold flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{t('cannotMarkFutureNotice')}</span>
+            <span>
+              {language === 'ar'
+                ? `هذا اليوم مجدول بتاريخ ${formatDisplayDate(displayedDayDate, 'ar')}. لا يمكنك تأكيد أوراده قبل ذلك التاريخ.`
+                : `This day is scheduled for ${formatDisplayDate(displayedDayDate, 'en')}. You can only mark its sessions on or after that date.`}
+            </span>
           </div>
         )}
 
@@ -699,13 +717,18 @@ export default function Dashboard({ setActiveTab }) {
           {CANONICAL_PROGRAM.map((day) => {
             const isDayFinished = day.sessions.every(sess => !!sessions[sess.id]?.isCompleted);
             const isDayPartial = !isDayFinished && day.sessions.some(sess => !!sessions[sess.id]?.isCompleted);
+            const isLocked = !isDayUnlocked(day.dayNumber);
 
-            const isCurrentActive = day.dayNumber === activeDay.dayNumber;
+            const isCurrentActive = day.dayNumber === defaultDayNumber;
 
             return (
               <button
                 key={day.dayNumber}
-                onClick={() => setViewedDayOffset(day.dayNumber - activeDay.dayNumber)}
+                onClick={() => setViewedDayOffset(day.dayNumber - defaultDayNumber)}
+                disabled={isLocked}
+                title={isLocked
+                  ? `${language === 'ar' ? 'مجدول في' : 'Scheduled for'} ${formatDisplayDate(getDayScheduledDate(day.dayNumber), language)}`
+                  : `${language === 'ar' ? 'اليوم' : 'Day'} ${day.dayNumber}`}
                 className={`h-7 sm:h-8 rounded-lg text-[10px] font-bold flex items-center justify-center transition-all ${
                   isCurrentActive
                     ? 'ring-2 ring-emerald-500 scale-105 z-10 bg-emerald-600 text-white shadow-xs'
@@ -713,6 +736,8 @@ export default function Dashboard({ setActiveTab }) {
                     ? 'bg-emerald-500 text-white'
                     : isDayPartial
                     ? 'bg-amber-400 text-slate-900 font-extrabold'
+                    : isLocked
+                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 opacity-50 cursor-not-allowed'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200'
                 }`}
               >

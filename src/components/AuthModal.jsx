@@ -19,7 +19,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { formatDate } from '../utils/scheduleEngine';
 import thabatLogo from '../assets/thabat-logo.png';
 
-export default function AuthModal({ isOpen, onClose, initialMode = 'login', onSuccess }) {
+export default function AuthModal({ isOpen, onClose, initialMode = 'login', onOpenAdminPortal, onSuccess }) {
   const { login, register, verifyOtp, resendOtp } = useAuth();
   const { t, isRtl, language } = useLanguage();
 
@@ -35,11 +35,11 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', onSu
   // OTP Verification state
   const [otpCode, setOtpCode] = useState('');
   const [activeEmail, setActiveEmail] = useState('');
-  const [devOtp, setDevOtp] = useState('');
   const [resendStatus, setResendStatus] = useState('');
 
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const todayStr = formatDate(new Date());
 
   // Synchronize mode when modal opens or initialMode changes
   useEffect(() => {
@@ -47,6 +47,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', onSu
       setMode(initialMode);
       setErrorMsg('');
       setResendStatus('');
+      setStartDate(formatDate(new Date()));
     }
   }, [isOpen, initialMode]);
 
@@ -62,7 +63,6 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', onSu
         const res = await login(fullName, email);
         if (res.requiresOtp) {
           setActiveEmail(res.email || email);
-          if (res.devOtp) setDevOtp(res.devOtp);
           setMode('verify_otp');
         } else {
           if (onSuccess) onSuccess();
@@ -74,6 +74,11 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', onSu
             ? "يجب الموافقة على إقرار حفظ القرآن الكريم كاملاً للمتابعة." 
             : "You must accept the solemn Hifz declaration to participate.");
         }
+        if (startDate < todayStr) {
+          throw new Error(language === 'ar'
+            ? "لا يمكن أن يكون تاريخ بدء البرنامج قبل اليوم."
+            : "The programme start date cannot be earlier than today.");
+        }
         const res = await register({
           fullName,
           email,
@@ -84,15 +89,14 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', onSu
         });
         if (res.requiresOtp) {
           setActiveEmail(res.email || email);
-          if (res.devOtp) setDevOtp(res.devOtp);
           setMode('verify_otp');
         } else {
           if (onSuccess) onSuccess();
           onClose();
         }
       } else if (mode === 'verify_otp') {
-        await verifyOtp(activeEmail || email, otpCode);
-        if (onSuccess) onSuccess();
+        const verifiedUser = await verifyOtp(activeEmail || email, otpCode);
+        if (onSuccess) onSuccess(verifiedUser);
         onClose();
       }
     } catch (err) {
@@ -106,8 +110,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', onSu
     try {
       setResendStatus('');
       setErrorMsg('');
-      const res = await resendOtp(activeEmail || email);
-      if (res.devOtp) setDevOtp(res.devOtp);
+      await resendOtp(activeEmail || email);
       setResendStatus(t('otpSent'));
     } catch (err) {
       setErrorMsg(err.message || "Failed to resend code.");
@@ -160,8 +163,10 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', onSu
             </p>
 
             {/* Purpose Box */}
-            <div className="mt-3 p-3 rounded-2xl bg-white/10 border border-white/10 text-xs text-emerald-100/90">
-              <strong className="block text-emerald-200 font-bold mb-0.5">{t('purposeTitle')}:</strong>
+            <div className="mt-3 p-3 rounded-2xl bg-white/10 border border-white/10 text-emerald-100/90 text-xs">
+              <strong className="block text-emerald-200 font-bold mb-0.5">
+                {t('purposeTitle')}:
+              </strong>
               {t('purposeDesc')}
             </div>
           </div>
@@ -194,21 +199,12 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', onSu
                     <Mail className="w-4 h-4 text-emerald-600" />
                     <span>{activeEmail || email}</span>
                   </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                    {language === 'ar'
+                      ? 'لم تصلك الرسالة؟ تحقق من مجلد البريد العشوائي (Spam/Junk) ثم أعد إرسال الرمز.'
+                      : "Didn't receive it? Check your spam/junk folder, then resend the code."}
+                  </p>
                 </div>
-
-                {/* Dev notice showing generated code */}
-                {devOtp && (
-                  <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 text-xs flex items-center justify-between">
-                    <span className="font-semibold">{t('devOtpNotice')} <strong className="font-mono text-sm tracking-widest text-emerald-700 dark:text-emerald-400">{devOtp}</strong></span>
-                    <button
-                      type="button"
-                      onClick={() => setOtpCode(devOtp)}
-                      className="px-2.5 py-1 rounded-lg bg-amber-200 dark:bg-amber-800 text-[11px] font-bold text-amber-900 dark:text-amber-100 hover:bg-amber-300 transition-colors cursor-pointer"
-                    >
-                      {language === 'ar' ? "تعبئة تلقائية" : "Auto-fill"}
-                    </button>
-                  </div>
-                )}
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
@@ -342,6 +338,7 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', onSu
                       <input
                         type="date"
                         value={startDate}
+                        min={todayStr}
                         onChange={(e) => setStartDate(e.target.value)}
                         className="w-full pl-10 pr-4 rtl:pl-4 rtl:pr-10 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                       />
@@ -374,14 +371,28 @@ export default function AuthModal({ isOpen, onClose, initialMode = 'login', onSu
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-700/20 flex items-center justify-center gap-2 group transition-all disabled:opacity-50 cursor-pointer"
+                  className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 shadow-emerald-700/20 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2 group transition-all disabled:opacity-50 cursor-pointer"
                 >
                   <span>{mode === 'login' ? t('btnLogin') : t('btnRegister')}</span>
                   <ArrowIcon className="w-4 h-4 group-hover:translate-x-1 rtl:group-hover:-translate-x-1 transition-transform" />
                 </button>
 
-                {/* Switch Mode */}
-                <div className="text-center pt-2 text-xs text-slate-500 dark:text-slate-400">
+                {/* Separate Administrator Portal entry */}
+                {mode === 'login' && onOpenAdminPortal && (
+                  <div className="pt-2 text-center border-t border-slate-100 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => { onClose(); onOpenAdminPortal(); }}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 transition-colors cursor-pointer"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+                      <span>{t('switchToAdminLogin')}</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Switch Mode (Register / Login) */}
+                <div className="text-center pt-1 text-xs text-slate-500 dark:text-slate-400">
                   {mode === 'login' ? (
                     <span>
                       {t('noAccount')}{' '}

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
-import { ProgramProvider, useProgram } from './context/ProgramContext';
+import { ProgramProvider } from './context/ProgramContext';
 import Navbar from './components/Navbar';
 import LandingPage from './components/LandingPage';
 import AuthModal from './components/AuthModal';
+import AdminAuthModal from './components/AdminAuthModal';
 import Dashboard from './components/Dashboard';
 import ProgressPage from './components/ProgressPage';
 import HistoryPage from './components/HistoryPage';
@@ -18,11 +19,12 @@ import thabatLogo from './assets/Elegant Thabāt Qur’an Emblem.png';
 
 function AppContent() {
   const { isAuthenticated, isAdmin, loading } = useAuth();
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   
   const [activeTab, setActiveTab] = useState('landing');
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState('login');
+  const [adminAuthOpen, setAdminAuthOpen] = useState(false);
 
   // URL Hash & Query routing (e.g. #admin, ?tab=admin)
   React.useEffect(() => {
@@ -36,8 +38,8 @@ function AppContent() {
       if (validTabs.includes(target)) {
         if (target === 'admin') {
           if (!isAuthenticated) {
-            setAuthModalMode('login');
-            setAuthModalOpen(true);
+            setAuthModalOpen(false);
+            setAdminAuthOpen(true);
           } else if (isAdmin) {
             setActiveTab('admin');
           } else {
@@ -67,9 +69,13 @@ function AppContent() {
   React.useEffect(() => {
     if (isAuthenticated) {
       const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
+      const deepLinkedTabs = ['dashboard', 'progress', 'history', 'certificate', 'settings'];
+
       if (hash === 'admin' && isAdmin) {
         setActiveTab('admin');
-      } else if (activeTab === 'landing') {
+      } else if (activeTab === 'landing' && !deepLinkedTabs.includes(hash)) {
+        // Only fall back to the dashboard when no deep link was requested,
+        // so refreshing on e.g. #settings does not bounce the user back.
         setActiveTab('dashboard');
       }
     }
@@ -97,8 +103,9 @@ function AppContent() {
       <Navbar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab}
-        onOpenLogin={() => { setAuthModalMode('login'); setAuthModalOpen(true); }}
-        onOpenRegister={() => { setAuthModalMode('register'); setAuthModalOpen(true); }}
+        onOpenLogin={() => { setAuthModalMode('login'); setAdminAuthOpen(false); setAuthModalOpen(true); }}
+        onOpenRegister={() => { setAuthModalMode('register'); setAdminAuthOpen(false); setAuthModalOpen(true); }}
+        onOpenAdminLogin={() => { setAuthModalOpen(false); setAdminAuthOpen(true); }}
       />
 
       {/* Main Container */}
@@ -107,8 +114,8 @@ function AppContent() {
         {/* If user is on landing page or not authenticated */}
         {activeTab === 'landing' && (
           <LandingPage
-            onGoToRegister={() => { setAuthModalMode('register'); setAuthModalOpen(true); }}
-            onGoToLogin={() => { setAuthModalMode('login'); setAuthModalOpen(true); }}
+            onGoToRegister={() => { setAuthModalMode('register'); setAdminAuthOpen(false); setAuthModalOpen(true); }}
+            onGoToLogin={() => { setAuthModalMode('login'); setAdminAuthOpen(false); setAuthModalOpen(true); }}
           />
         )}
 
@@ -120,16 +127,30 @@ function AppContent() {
         {isAuthenticated && activeTab === 'settings' && <SettingsPage />}
 
         {/* Admin Dashboard */}
-        {isAuthenticated && isAdmin && activeTab === 'admin' && <AdminDashboard />}
+        {isAuthenticated && isAdmin && activeTab === 'admin' && <AdminDashboard setActiveTab={setActiveTab} />}
 
       </main>
 
-      {/* Auth Modal for Login and Registration */}
+      {/* Participant auth modal (passwordless email OTP) */}
       <AuthModal
         isOpen={authModalOpen}
         initialMode={authModalMode}
         onClose={() => setAuthModalOpen(false)}
-        onSuccess={() => setActiveTab('dashboard')}
+        onOpenAdminPortal={() => setAdminAuthOpen(true)}
+        onSuccess={(user) => {
+          setActiveTab(user?.role === 'admin' ? 'admin' : 'dashboard');
+        }}
+      />
+
+      {/* Dedicated administrator portal (email + password, OTP reset) */}
+      <AdminAuthModal
+        isOpen={adminAuthOpen}
+        onClose={() => setAdminAuthOpen(false)}
+        onSuccess={() => setActiveTab('admin')}
+        onSwitchToParticipant={() => {
+          setAuthModalMode('login');
+          setAuthModalOpen(true);
+        }}
       />
 
       {/* Universal Footer */}
@@ -150,14 +171,14 @@ function AppContent() {
 
           {/* Support and Inquiry Footer Row */}
           <div className="pt-3 border-t border-slate-200/60 dark:border-slate-800/60 flex flex-wrap items-center justify-between gap-3 text-[11px] text-slate-500 dark:text-slate-400">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
               <span className="font-semibold text-slate-700 dark:text-slate-300">{t('supportTitle')}:</span>
               <a 
                 href="mailto:bellomuhyideen0001@gmail.com?subject=THABAT%20Inquiry"
-                className="hover:text-emerald-600 dark:hover:text-emerald-400 underline underline-offset-2 flex items-center gap-1"
+                className="hover:text-emerald-600 dark:hover:text-emerald-400 underline underline-offset-2 flex items-center gap-1 min-w-0"
               >
-                <Mail className="w-3 h-3 text-emerald-600" />
-                <span>bellomuhyideen0001@gmail.com</span>
+                <Mail className="w-3 h-3 text-emerald-600 shrink-0" />
+                <span className="break-all">bellomuhyideen0001@gmail.com</span>
               </a>
               <span>•</span>
               <a 

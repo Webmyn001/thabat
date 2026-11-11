@@ -1,14 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Award, 
-  CheckCircle2, 
   Lock, 
-  Download, 
   Printer, 
   ShieldCheck, 
-  Calendar, 
   Sparkles,
-  QrCode,
   Globe
 } from 'lucide-react';
 import { useAuth, API_BASE } from '../context/AuthContext';
@@ -18,17 +14,38 @@ import { formatDisplayDate } from '../utils/scheduleEngine.js';
 import thabatLogo from '../assets/thabat-logo.png';
 
 export default function CertificateView() {
-  const { token, currentUser } = useAuth();
-  const { t, language, isRtl } = useLanguage();
+  const { token, isAdmin } = useAuth();
+  const { t, language } = useLanguage();
   const { metrics } = useProgram();
 
   const [eligibilityData, setEligibilityData] = useState(null);
   const [certLanguage, setCertLanguage] = useState(language);
   const [isGenerating, setIsGenerating] = useState(false);
   const [certificate, setCertificate] = useState(null);
+  const [isPreview, setIsPreview] = useState(false);
 
   useEffect(() => {
     if (!token) return;
+
+    // Administrators can preview the certificate template from Day 1.
+    // The backend endpoint is protected by requireAdmin and is never exposed
+    // to participant accounts.
+    if (isAdmin) {
+      fetch(`${API_BASE}/admin/certificate-preview`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.certificate) {
+            setCertificate(data.certificate);
+            setIsPreview(true);
+            setEligibilityData({ isEligible: true, ...data.certificate });
+          }
+        })
+        .catch(console.error);
+      return;
+    }
+
     fetch(`${API_BASE}/certificates/eligibility`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
@@ -40,7 +57,7 @@ export default function CertificateView() {
         }
       })
       .catch(console.error);
-  }, [token, metrics.totalSessionsCompleted]);
+  }, [token, isAdmin, metrics.totalSessionsCompleted]);
 
   const handleGenerateCertificate = async () => {
     if (!token) return;
@@ -67,7 +84,7 @@ export default function CertificateView() {
   };
 
   const handlePrint = () => {
-    if (certificate && token) {
+    if (certificate && token && !isPreview) {
       // Track download on server
       fetch(`${API_BASE}/certificates/${certificate.id || certificate.certificateNumber}/track-download`, {
         method: 'POST',
@@ -77,7 +94,9 @@ export default function CertificateView() {
     window.print();
   };
 
-  const isEligible = eligibilityData ? eligibilityData.isEligible : metrics.totalSessionsCompleted >= (metrics.totalSessionsTarget || 180);
+  const isEligible = isAdmin
+    ? true
+    : (eligibilityData ? eligibilityData.isEligible : metrics.totalSessionsCompleted >= (metrics.totalSessionsTarget || 180));
   const remainingSessions = Math.max(0, (metrics.totalSessionsTarget || 180) - metrics.totalSessionsCompleted);
 
   return (
@@ -98,7 +117,7 @@ export default function CertificateView() {
         </div>
 
         {certificate && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setCertLanguage(prev => prev === 'en' ? 'ar' : 'en')}
               className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5 shadow-xs"
@@ -117,6 +136,19 @@ export default function CertificateView() {
           </div>
         )}
       </div>
+
+      {/* Administrator-only template preview notice */}
+      {isAdmin && isPreview && (
+        <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 text-xs sm:text-sm flex items-start gap-2 max-w-4xl mx-auto">
+          <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <span>
+            <strong>{language === 'ar' ? 'معاينة المشرف:' : 'Administrator Preview:'}</strong>{' '}
+            {language === 'ar'
+              ? 'هذه معاينة لقالب الشهادة الرسمي متاحة للمشرفين فقط من اليوم الأول. الشهادة الحقيقية للمشاركين تظل مقفلة حتى إتمام جميع الأوراد الـ 180.'
+              : 'This is a preview of the official certificate template, available to administrators only from Day 1. Real participant certificates remain locked until all 180 sessions are completed.'}
+          </span>
+        </div>
+      )}
 
       {/* Ineligible State Card */}
       {!isEligible && (
@@ -182,10 +214,10 @@ export default function CertificateView() {
 
       {/* Printable Certificate Template */}
       {certificate && (
-        <div className="print-area max-w-4xl mx-auto bg-white text-slate-900 p-8 sm:p-14 rounded-3xl shadow-2xl border-8 border-emerald-800/20 relative overflow-hidden">
+        <div className="print-area max-w-4xl mx-auto bg-white text-slate-900 p-3 sm:p-14 rounded-3xl shadow-2xl border-4 sm:border-8 border-emerald-800/20 relative overflow-hidden">
           
           {/* Ornate Islamic Border Frame */}
-          <div className="border-4 border-emerald-700 p-6 sm:p-10 rounded-2xl relative">
+          <div className="border-2 sm:border-4 border-emerald-700 p-3 sm:p-10 rounded-2xl relative">
             <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-amber-500" />
             <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-amber-500" />
             <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-amber-500" />
@@ -216,7 +248,7 @@ export default function CertificateView() {
                 {certLanguage === 'ar' ? "تَشْهَدُ إِدَارَةُ بَرْنَامَجِ ثَبَاتٍ بِأَنَّ الحَافِظَ / الحَافِظَةَ:" : "This certifies that the Hafidh:"}
               </p>
               
-              <div className="text-2xl sm:text-4xl font-extrabold text-emerald-800 border-b-2 border-emerald-600/30 inline-block px-8 py-2">
+              <div className="text-xl sm:text-4xl font-extrabold text-emerald-800 border-b-2 border-emerald-600/30 inline-block px-3 sm:px-8 py-2 break-words max-w-full">
                 {certificate.participantName}
               </div>
 
@@ -234,19 +266,19 @@ export default function CertificateView() {
             </div>
 
             {/* Score & Distinction Metric (As requested by user) */}
-            <div className="my-8 p-4 rounded-xl bg-emerald-50/70 border border-emerald-200/80 max-w-xl mx-auto flex items-center justify-around text-center text-xs">
+            <div className="my-8 p-4 rounded-xl bg-emerald-50/70 border border-emerald-200/80 max-w-xl mx-auto flex flex-wrap items-center justify-center gap-4 text-center text-xs">
               <div>
                 <span className="text-slate-400 uppercase font-bold text-[10px] block">{t('certScore')}</span>
                 <span className="text-2xl font-black text-emerald-800">{certificate.scorePercent}%</span>
               </div>
-              <div className="w-px h-8 bg-emerald-200" />
+              <div className="hidden sm:block w-px h-8 bg-emerald-200" />
               <div>
                 <span className="text-slate-400 uppercase font-bold text-[10px] block">{t('certGrade')}</span>
                 <span className="text-sm sm:text-base font-extrabold text-emerald-900">
                   {certLanguage === 'ar' ? certificate.gradeTitleAr : certificate.gradeTitleEn}
                 </span>
               </div>
-              <div className="w-px h-8 bg-emerald-200" />
+              <div className="hidden sm:block w-px h-8 bg-emerald-200" />
               <div>
                 <span className="text-slate-400 uppercase font-bold text-[10px] block">{t('missedDays')}</span>
                 <span className="text-sm font-bold text-slate-700">{certificate.missedDaysCount}</span>
@@ -257,7 +289,7 @@ export default function CertificateView() {
             <div className="mt-10 pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-6 text-xs text-slate-600">
               
               <div className="space-y-1 text-center sm:text-left rtl:sm:text-right">
-                <div className="font-bold text-slate-800">{t('certNumber')}: <span className="font-mono text-emerald-800">{certificate.certificateNumber}</span></div>
+                <div className="font-bold text-slate-800 break-all">{t('certNumber')}: <span className="font-mono text-emerald-800">{certificate.certificateNumber}</span></div>
                 <div>{t('issueDate')}: {formatDisplayDate(certificate.issueDate, certLanguage)}</div>
                 <div className="text-[10px] text-slate-400">Verified by Thabāt Cryptographic Registry</div>
               </div>

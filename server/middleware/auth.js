@@ -1,3 +1,4 @@
+import '../config/env.js';
 import jwt from 'jsonwebtoken';
 import { store } from '../data/store.js';
 

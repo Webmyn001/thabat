@@ -44,6 +44,16 @@
   background: rgba(16, 185, 129, 0.4);
 }
 
+/* Hide scrollbars on horizontal sliding navigation */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Islamic pattern background watermark */
 .islamic-pattern-bg {
   background-image: radial-gradient(rgba(16, 185, 129, 0.08) 1.5px, transparent 1.5px),

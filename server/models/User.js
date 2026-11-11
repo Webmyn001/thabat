@@ -6,11 +6,15 @@ const UserSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   phone: { type: String, default: "" },
   role: { type: String, enum: ['participant', 'admin'], default: 'participant' },
+  passwordHash: { type: String },
+  mustChangePassword: { type: Boolean, default: false },
+  passwordUpdatedAt: { type: Date },
   isEmailVerified: { type: Boolean, default: false },
   emailVerifiedAt: { type: Date },
   hifzDeclarationAccepted: { type: Boolean, default: true },
   hifzDeclarationAcceptedAt: { type: Date, default: Date.now },
   preferredLanguage: { type: String, enum: ['ar', 'en'], default: 'en' },
+  lastLoginAt: { type: Date },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });

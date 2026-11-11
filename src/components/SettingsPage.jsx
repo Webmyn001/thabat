@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Settings as SettingsIcon, 
   Calendar, 
@@ -31,24 +31,44 @@ export default function SettingsPage() {
     sessions, 
     updateStartDate, 
     markSessionComplete, 
-    undoSessionComplete 
+    undoSessionComplete,
+    isDayUnlocked,
+    getDayScheduledDate
   } = useProgram();
 
   const [startDateInput, setStartDateInput] = useState(enrolment?.startDate || formatDate(new Date()));
+  const [startDateError, setStartDateError] = useState('');
   const [dateUpdatedSuccess, setDateUpdatedSuccess] = useState(false);
+  const todayStr = formatDate(new Date());
   const [filterPhase, setFilterPhase] = useState('all');
   const [searchDayQuery, setSearchDayQuery] = useState('');
+  const [correctionError, setCorrectionError] = useState('');
 
   // Profile update
   const [phoneInput, setPhoneInput] = useState(currentUser?.phone || '');
   const [profileSaved, setProfileSaved] = useState(false);
 
+  // The enrolment loads asynchronously, so keep the date field in sync with
+  // the stored start date instead of freezing the mount-time default.
+  useEffect(() => {
+    if (enrolment?.startDate) setStartDateInput(enrolment.startDate);
+  }, [enrolment?.startDate]);
+
   const handleSaveStartDate = async (e) => {
     e.preventDefault();
+    setStartDateError('');
     if (!startDateInput) return;
-    await updateStartDate(startDateInput);
-    setDateUpdatedSuccess(true);
-    setTimeout(() => setDateUpdatedSuccess(false), 2500);
+    if (startDateInput < todayStr) {
+      setStartDateError('The programme start date cannot be earlier than today.');
+      return;
+    }
+    try {
+      await updateStartDate(startDateInput);
+      setDateUpdatedSuccess(true);
+      setTimeout(() => setDateUpdatedSuccess(false), 2500);
+    } catch (err) {
+      setStartDateError(err.message || 'Failed to update the programme start date.');
+    }
   };
 
   const handleSaveProfile = async (e) => {
@@ -74,12 +94,17 @@ export default function SettingsPage() {
   };
 
   const handleToggleSession = async (dayNumber, sessionType) => {
-    const sessionId = sessionType === 'daily' ? `d${dayNumber}_daily` : `d${dayNumber}_${sessionType}`;
+    setCorrectionError('');
+    const sessionId = `d${dayNumber}_${sessionType}`;
     const isDone = !!sessions[sessionId]?.isCompleted;
-    if (isDone) {
-      await undoSessionComplete(dayNumber, sessionType);
-    } else {
-      await markSessionComplete(dayNumber, sessionType);
+    try {
+      if (isDone) {
+        await undoSessionComplete(dayNumber, sessionType);
+      } else {
+        await markSessionComplete(dayNumber, sessionType);
+      }
+    } catch (err) {
+      setCorrectionError(err.message || 'Failed to update this session.');
     }
   };
 
@@ -104,15 +129,23 @@ export default function SettingsPage() {
   };
 
   const filteredDays = CANONICAL_PROGRAM.filter(d => {
-    if (filterPhase === '1' && d.phase !== 1) return false;
-    if (filterPhase === '2' && d.phase !== 2) return false;
-    if (filterPhase === '3' && d.phase !== 3) return false;
+    if (filterPhase !== 'all' && d.phase !== Number(filterPhase)) return false;
     if (searchDayQuery.trim()) {
       const q = searchDayQuery.trim().toLowerCase();
       return d.dayNumber.toString().includes(q) || d.juzLabelEn.toLowerCase().includes(q);
     }
     return true;
   });
+
+  const sessionTypeLabel = (type) => {
+    switch (type) {
+      case 'morning': return 'Morning';
+      case 'evening': return 'Evening';
+      case 'reading': return 'Reading';
+      case 'offhand': return 'Offhand';
+      default: return type;
+    }
+  };
 
   return (
     <div className="space-y-8 pb-16">
@@ -181,9 +214,16 @@ export default function SettingsPage() {
               <input
                 type="date"
                 value={startDateInput}
-                onChange={(e) => setStartDateInput(e.target.value)}
+                min={todayStr}
+                onChange={(e) => {
+                  setStartDateInput(e.target.value);
+                  if (startDateError) setStartDateError('');
+                }}
                 className="w-full p-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-xs font-bold"
               />
+              {startDateError && (
+                <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-1 font-semibold">{startDateError}</p>
+              )}
             </div>
 
             <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
@@ -220,13 +260,13 @@ export default function SettingsPage() {
             <p className="text-xs text-slate-500 mt-0.5">Review or correct any past session completed offline.</p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <input
               type="text"
               placeholder="Search Day or Juz..."
               value={searchDayQuery}
               onChange={(e) => setSearchDayQuery(e.target.value)}
-              className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs w-48"
+              className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs w-full sm:w-48"
             />
             <select
               value={filterPhase}
@@ -237,12 +277,20 @@ export default function SettingsPage() {
               <option value="1">Phase 1</option>
               <option value="2">Phase 2</option>
               <option value="3">Phase 3</option>
+              <option value="4">Phase 4</option>
+              <option value="5">Phase 5</option>
             </select>
           </div>
         </div>
 
-        <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden max-h-[380px] overflow-y-auto">
-          <table className="w-full text-left text-xs">
+        {correctionError && (
+          <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs font-medium">
+            {correctionError}
+          </div>
+        )}
+
+        <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-x-auto max-h-[380px] overflow-y-auto">
+          <table className="w-full min-w-[620px] text-left text-xs">
             <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-slate-400 uppercase font-bold sticky top-0">
               <tr>
                 <th className="py-2.5 px-4">Day</th>
@@ -254,51 +302,37 @@ export default function SettingsPage() {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
               {filteredDays.map((day) => {
-                const mDone = !!sessions[`d${day.dayNumber}_morning`]?.isCompleted;
-                const eDone = !!sessions[`d${day.dayNumber}_evening`]?.isCompleted;
-                const dDone = !!sessions[`d${day.dayNumber}_daily`]?.isCompleted;
+                const locked = !isDayUnlocked(day.dayNumber);
 
                 return (
                   <tr key={day.dayNumber} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                    <td className="py-2.5 px-4 font-bold text-slate-900 dark:text-white">Day {day.dayNumber}</td>
-                    <td className="py-2.5 px-4 text-slate-400">Phase {day.phase}</td>
+                    <td className="py-2.5 px-4 font-bold text-slate-900 dark:text-white whitespace-nowrap">Day {day.dayNumber}</td>
+                    <td className="py-2.5 px-4 text-slate-400 whitespace-nowrap">Phase {day.phase}</td>
                     <td className="py-2.5 px-4 font-semibold text-emerald-700 dark:text-emerald-400">{day.juzLabelEn}</td>
-                    
-                    {day.phase !== 3 ? (
-                      <>
-                        <td className="py-2.5 px-4 text-center">
+
+                    {day.sessions.map((sess) => {
+                      const isDone = !!sessions[sess.id]?.isCompleted;
+                      return (
+                        <td key={sess.id} className="py-2.5 px-4 text-center">
                           <button
-                            onClick={() => handleToggleSession(day.dayNumber, 'morning')}
-                            className={`px-3 py-1 rounded-lg text-[11px] font-bold ${
-                              mDone ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                            onClick={() => handleToggleSession(day.dayNumber, sess.type)}
+                            disabled={locked}
+                            title={locked
+                              ? `${language === 'ar' ? 'مجدول في' : 'Scheduled for'} ${formatDisplayDate(getDayScheduledDate(day.dayNumber), language)}`
+                              : `${sessionTypeLabel(sess.type)} · Day ${day.dayNumber}`}
+                            className={`px-3 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-colors ${
+                              locked
+                                ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 opacity-50 cursor-not-allowed'
+                                : isDone
+                                  ? 'bg-emerald-600 text-white'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'
                             }`}
                           >
-                            {mDone ? 'Completed' : 'Pending'}
+                            {sessionTypeLabel(sess.type)}: {isDone ? 'Completed' : locked ? 'Locked' : 'Pending'}
                           </button>
                         </td>
-                        <td className="py-2.5 px-4 text-center">
-                          <button
-                            onClick={() => handleToggleSession(day.dayNumber, 'evening')}
-                            className={`px-3 py-1 rounded-lg text-[11px] font-bold ${
-                              eDone ? 'bg-teal-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                            }`}
-                          >
-                            {eDone ? 'Completed' : 'Pending'}
-                          </button>
-                        </td>
-                      </>
-                    ) : (
-                      <td colSpan={2} className="py-2.5 px-4 text-center">
-                        <button
-                          onClick={() => handleToggleSession(day.dayNumber, 'daily')}
-                          className={`w-full max-w-[180px] py-1 rounded-lg text-[11px] font-bold ${
-                            dDone ? 'bg-emerald-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                          }`}
-                        >
-                          {dDone ? 'Daily Complete' : 'Daily Pending'}
-                        </button>
-                      </td>
-                    )}
+                      );
+                    })}
                   </tr>
                 );
               })}

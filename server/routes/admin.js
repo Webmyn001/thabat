@@ -1,7 +1,7 @@
 import express from 'express';
 import { store } from '../data/store.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
-import { calculateScheduleMetrics, formatDate, TOTAL_PROGRAM_SESSIONS } from '../../src/utils/scheduleEngine.js';
+import { calculateScheduleMetrics, calculateCertificateScore, formatDate, TOTAL_PROGRAM_SESSIONS } from '../../src/utils/scheduleEngine.js';
 
 const router = express.Router();
 
@@ -128,6 +128,88 @@ router.get('/participants/:id', (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch participant details." });
+  }
+});
+
+// DELETE /api/admin/participants/:id
+// Permanently removes a participant and all associated progress records.
+// The UI must present an explicit Yes/No confirmation before calling this.
+router.delete('/participants/:id', (req, res) => {
+  try {
+    const user = store.findOne('users', u => u.id === req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: "Participant not found." });
+    }
+
+    if (user.role === 'admin') {
+      return res.status(400).json({
+        error: "Administrator accounts cannot be deleted from the participant directory."
+      });
+    }
+
+    const deletedEmail = user.email;
+
+    // Cascade delete: progress, logs, certificates, and outstanding OTP codes.
+    store.delete('enrolments', e => e.userId === user.id);
+    store.delete('sessionLogs', s => s.userId === user.id);
+    store.delete('certificates', c => c.userId === user.id);
+    store.delete('verificationCodes', c => c.email === deletedEmail);
+    store.delete('users', u => u.id === user.id);
+
+    store.logAudit(
+      req.user.id,
+      "DELETE_PARTICIPANT",
+      `Deleted participant ${user.fullName} <${deletedEmail}> and all associated records`
+    );
+
+    res.json({
+      message: `${user.fullName} has been permanently deleted.`,
+      deletedUserId: user.id
+    });
+  } catch (err) {
+    console.error("Delete participant error:", err);
+    res.status(500).json({ error: "Failed to delete participant." });
+  }
+});
+
+// GET /api/admin/certificate-preview
+// Administrators can preview the certificate template from day one. This is
+// generated on the fly and is never stored in the certificate registry.
+router.get('/certificate-preview', (req, res) => {
+  try {
+    const settings = store.getSettings();
+    const admin = store.findOne('users', u => u.id === req.user.id);
+    const scoreInfo = calculateCertificateScore(TOTAL_PROGRAM_SESSIONS, 0);
+
+    const previewCertificate = {
+      id: "admin_preview",
+      certificateNumber: `THB-PREVIEW-${new Date().getFullYear()}`,
+      userId: req.user.id,
+      participantName: admin?.fullName || req.user.fullName,
+      issueDate: formatDate(new Date()),
+      totalSessionsCompleted: TOTAL_PROGRAM_SESSIONS,
+      missedDaysCount: 0,
+      scorePercent: scoreInfo.scorePercent,
+      gradeTitleEn: scoreInfo.gradeTitleEn,
+      gradeTitleAr: scoreInfo.gradeTitleAr,
+      directorNameEn: settings.directorNameEn,
+      directorNameAr: settings.directorNameAr,
+      signatureTitleEn: settings.signatureTitleEn,
+      signatureTitleAr: settings.signatureTitleAr,
+      signatureImage: settings.signatureImage || "",
+      downloadCount: 0,
+      isPreview: true,
+      createdAt: new Date().toISOString()
+    };
+
+    res.json({
+      certificate: previewCertificate,
+      isPreview: true,
+      message: "Administrator certificate preview. This is not a real certificate."
+    });
+  } catch (err) {
+    console.error("Certificate preview error:", err);
+    res.status(500).json({ error: "Failed to generate certificate preview." });
   }
 });
 
