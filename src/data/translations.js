@@ -190,7 +190,17 @@ export const TRANSLATIONS = {
     tabParticipants: "Participants",
     tabInspirations: "Inspirations (180)",
     tabSettings: "Platform Settings",
-    saveSettings: "Save Settings"
+    saveSettings: "Save Settings",
+
+    // Support & Inquiries
+    supportTitle: "Support & Inquiries",
+    supportSubtitle: "Need assistance or have questions about the 90-day revision journey? We are here to help you.",
+    supportEmail: "Email Support",
+    supportWhatsapp: "WhatsApp Support",
+    supportPhone: "Direct Phone Call",
+    supportAvailable: "Always available to assist participants for the sake of Allah.",
+    whatsappSupportTooltip: "WhatsApp Support (+234 916 402 8709)",
+    whatsappPretext: "Assalamu Alaikum, I need support with the THABĀT Qur'an Revision Programme."
   },
   
   ar: {
@@ -384,6 +394,16 @@ export const TRANSLATIONS = {
     tabParticipants: "إدارة المشاركين",
     tabInspirations: "مكتبة التذكيرات (180)",
     tabSettings: "إعدادات المنصة",
-    saveSettings: "حفظ الإعدادات"
+    saveSettings: "حفظ الإعدادات",
+
+    // Support & Inquiries
+    supportTitle: "الدعم والاستفسارات",
+    supportSubtitle: "هل لديك استفسار أو تحتاج لمساعدة في رحلة مراجعة الـ 90 يوماً؟ يسعدنا التواصل معك وخدمتك لوجه الله تعالى.",
+    supportEmail: "الدعم عبر البريد الإلكتروني",
+    supportWhatsapp: "الدعم عبر واتساب",
+    supportPhone: "الاتصال الهاتفي المباشر",
+    supportAvailable: "في خدمتكم دائماً لتيسير رحلة تثبيت كتاب الله تعالى.",
+    whatsappSupportTooltip: "الدعم عبر واتساب (+234 916 402 8709)",
+    whatsappPretext: "السلام عليكم ورحمة الله، أحتاج إلى مساعدة واستفسار بخصوص برنامج ثبات لمراجعة القرآن الكريم."
   }
 };

@@ -11,6 +11,8 @@ import HistoryPage from './components/HistoryPage';
 import CertificateView from './components/CertificateView';
 import SettingsPage from './components/SettingsPage';
 import AdminDashboard from './components/AdminDashboard';
+import FloatingWhatsApp from './components/FloatingWhatsApp';
+import { Mail, Phone } from 'lucide-react';
 
 import thabatLogo from './assets/Elegant Thabāt Qur’an Emblem.png';
 
@@ -22,12 +24,56 @@ function AppContent() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState('login');
 
-  // If user logs in and was on landing, transition to dashboard
+  // URL Hash & Query routing (e.g. #admin, ?tab=admin)
   React.useEffect(() => {
-    if (isAuthenticated && activeTab === 'landing') {
-      setActiveTab('dashboard');
+    const handleUrlRouting = () => {
+      const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab')?.toLowerCase();
+      const target = tabParam || hash;
+
+      const validTabs = ['landing', 'dashboard', 'progress', 'history', 'certificate', 'settings', 'admin'];
+      if (validTabs.includes(target)) {
+        if (target === 'admin') {
+          if (!isAuthenticated) {
+            setAuthModalMode('login');
+            setAuthModalOpen(true);
+          } else if (isAdmin) {
+            setActiveTab('admin');
+          } else {
+            setActiveTab('dashboard');
+          }
+        } else {
+          setActiveTab(target);
+        }
+      }
+    };
+
+    handleUrlRouting();
+    window.addEventListener('hashchange', handleUrlRouting);
+    return () => window.removeEventListener('hashchange', handleUrlRouting);
+  }, [isAuthenticated, isAdmin]);
+
+  // Sync hash with active tab
+  React.useEffect(() => {
+    if (activeTab && activeTab !== 'landing') {
+      if (window.location.hash.replace(/^#\/?/, '').toLowerCase() !== activeTab) {
+        window.location.hash = activeTab;
+      }
     }
-  }, [isAuthenticated, activeTab]);
+  }, [activeTab]);
+
+  // If user logs in and was on landing or requested admin
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
+      if (hash === 'admin' && isAdmin) {
+        setActiveTab('admin');
+      } else if (activeTab === 'landing') {
+        setActiveTab('dashboard');
+      }
+    }
+  }, [isAuthenticated, isAdmin]);
 
   if (loading) {
     return (
@@ -88,19 +134,52 @@ function AppContent() {
 
       {/* Universal Footer */}
       <footer className="mt-auto border-t border-slate-200 dark:border-slate-800/80 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xs py-6">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-700 dark:text-slate-300">
-              THABĀT | ثبات
-            </span>
-            <span>• {t('descriptor')}</span>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-slate-700 dark:text-slate-300">
+                THABĀT | ثبات
+              </span>
+              <span>• {t('descriptor')}</span>
+            </div>
+
+            <div className="text-center sm:text-right font-arabic text-sm text-emerald-800 dark:text-emerald-300">
+              اللهم اجعل القرآن ربيع قلوبنا ونور صدورنا وجلاء أحزاننا وذهاب همومنا
+            </div>
           </div>
 
-          <div className="text-center sm:text-right font-arabic text-sm text-emerald-800 dark:text-emerald-300">
-            اللهم اجعل القرآن ربيع قلوبنا ونور صدورنا وجلاء أحزاننا وذهاب همومنا
+          {/* Support and Inquiry Footer Row */}
+          <div className="pt-3 border-t border-slate-200/60 dark:border-slate-800/60 flex flex-wrap items-center justify-between gap-3 text-[11px] text-slate-500 dark:text-slate-400">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-slate-700 dark:text-slate-300">{t('supportTitle')}:</span>
+              <a 
+                href="mailto:bellomuhyideen0001@gmail.com?subject=THABAT%20Inquiry"
+                className="hover:text-emerald-600 dark:hover:text-emerald-400 underline underline-offset-2 flex items-center gap-1"
+              >
+                <Mail className="w-3 h-3 text-emerald-600" />
+                <span>bellomuhyideen0001@gmail.com</span>
+              </a>
+              <span>•</span>
+              <a 
+                href="https://wa.me/2349164028709?text=Assalamu%20Alaikum%2C%20I%20need%20support%20with%20THAB%C4%80T."
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-emerald-600 dark:hover:text-emerald-400 underline underline-offset-2 flex items-center gap-1"
+              >
+                <Phone className="w-3 h-3 text-[#25D366]" />
+                <span>+234 916 402 8709</span>
+              </a>
+            </div>
+
+            <div>
+              <span>© {new Date().getFullYear()} THABĀT. {t('freeBadge')}.</span>
+            </div>
           </div>
         </div>
       </footer>
+
+      {/* Persistent Floating WhatsApp Icon */}
+      <FloatingWhatsApp />
 
     </div>
   );

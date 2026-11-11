@@ -159,9 +159,23 @@ function seedDefaultData() {
       id: "admin_1",
       fullName: "Bello Muhyideen",
       email: "admin@thabat.org",
-      phone: "+1234567890",
+      phone: "+2349164028709",
       passwordHash: adminPasswordHash,
       role: "admin",
+      isEmailVerified: true,
+      hifzDeclarationAccepted: true,
+      hifzDeclarationAcceptedAt: new Date().toISOString(),
+      preferredLanguage: "en",
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: "admin_2",
+      fullName: "Bello Muhyideen",
+      email: "bellomuhyideen0001@gmail.com",
+      phone: "+2349164028709",
+      passwordHash: adminPasswordHash,
+      role: "admin",
+      isEmailVerified: true,
       hifzDeclarationAccepted: true,
       hifzDeclarationAcceptedAt: new Date().toISOString(),
       preferredLanguage: "en",
@@ -173,22 +187,48 @@ function seedDefaultData() {
 }
 
 function ensureAdminUser() {
-  const hasAdmin = database.users.some(u => u.role === 'admin' || u.email === 'admin@thabat.org');
-  if (!hasAdmin) {
-    const salt = bcrypt.genSaltSync(10);
-    const adminPasswordHash = bcrypt.hashSync("Admin123!", salt);
-    database.users.push({
-      id: `admin_${Date.now()}`,
-      fullName: "Bello Muhyideen",
-      email: "admin@thabat.org",
-      phone: "+1234567890",
-      passwordHash: adminPasswordHash,
-      role: "admin",
-      hifzDeclarationAccepted: true,
-      hifzDeclarationAcceptedAt: new Date().toISOString(),
-      preferredLanguage: "en",
-      createdAt: new Date().toISOString()
-    });
+  const admins = [
+    { email: "admin@thabat.org", fullName: "Bello Muhyideen", phone: "+2349164028709" },
+    { email: "bellomuhyideen0001@gmail.com", fullName: "Bello Muhyideen", phone: "+2349164028709" }
+  ];
+
+  let storeUpdated = false;
+  admins.forEach((adm, idx) => {
+    let existing = database.users.find(u => u.email === adm.email);
+    if (!existing) {
+      const salt = bcrypt.genSaltSync(10);
+      const adminPasswordHash = bcrypt.hashSync("Admin123!", salt);
+      database.users.push({
+        id: `admin_${idx + 1}`,
+        fullName: adm.fullName,
+        email: adm.email,
+        phone: adm.phone,
+        passwordHash: adminPasswordHash,
+        role: "admin",
+        isEmailVerified: true,
+        hifzDeclarationAccepted: true,
+        hifzDeclarationAcceptedAt: new Date().toISOString(),
+        preferredLanguage: "en",
+        createdAt: new Date().toISOString()
+      });
+      storeUpdated = true;
+    } else {
+      if (existing.role !== 'admin') {
+        existing.role = 'admin';
+        storeUpdated = true;
+      }
+      if (existing.phone !== adm.phone) {
+        existing.phone = adm.phone;
+        storeUpdated = true;
+      }
+      if (!existing.isEmailVerified) {
+        existing.isEmailVerified = true;
+        storeUpdated = true;
+      }
+    }
+  });
+
+  if (storeUpdated) {
     saveStore();
   }
 }

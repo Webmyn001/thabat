@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import thabatLogo from '../assets/thabat-logo.png';
+import SupportSection from './SupportSection';
 
 export default function LandingPage({ onGoToRegister, onGoToLogin }) {
   const { t, isRtl, language } = useLanguage();
@@ -385,6 +386,9 @@ export default function LandingPage({ onGoToRegister, onGoToLogin }) {
           </button>
         </div>
       </section>
+
+      {/* 6. Support & Inquiry Section */}
+      <SupportSection />
 
     </div>
   );

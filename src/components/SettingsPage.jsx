@@ -20,6 +20,7 @@ import {
   formatDisplayDate, 
   formatDate 
 } from '../utils/scheduleEngine.js';
+import SupportSection from './SupportSection';
 
 export default function SettingsPage() {
   const { currentUser, token, refreshUser } = useAuth();
@@ -324,6 +325,9 @@ export default function SettingsPage() {
           <span>Export JSON File</span>
         </button>
       </section>
+
+      {/* Support & Inquiries */}
+      <SupportSection compact={true} />
 
     </div>
   );
