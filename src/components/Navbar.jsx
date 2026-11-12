@@ -68,13 +68,13 @@ export default function Navbar({ activeTab, setActiveTab, onOpenLogin, onOpenReg
   return (
     <>
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl 2xl:max-w-[88rem] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 sm:h-20">
           
           {/* Brand Identity */}
           <div 
             onClick={() => selectTab(isAuthenticated ? 'dashboard' : 'landing')}
-            className="flex items-center gap-2 sm:gap-3 cursor-pointer select-none min-w-0"
+            className="flex items-center gap-2 sm:gap-3 cursor-pointer select-none shrink-0"
           >
             <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl overflow-hidden shadow-md shadow-emerald-950/20 ring-2 ring-emerald-500/30 bg-emerald-950 flex items-center justify-center shrink-0">
               <img 
@@ -92,7 +92,7 @@ export default function Navbar({ activeTab, setActiveTab, onOpenLogin, onOpenReg
                   | ثبات
                 </span>
               </div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block font-medium truncate">
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 hidden xl:block font-medium truncate">
                 {t('descriptor')}
               </div>
             </div>
@@ -100,7 +100,7 @@ export default function Navbar({ activeTab, setActiveTab, onOpenLogin, onOpenReg
 
           {/* Desktop Navigation Links for Authenticated Users */}
           {isAuthenticated ? (
-            <nav className="hidden md:flex items-center gap-1 bg-slate-100 dark:bg-slate-800/60 p-1.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+            <nav className="hidden lg:flex items-center gap-1 bg-slate-100 dark:bg-slate-800/60 p-1.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60 min-w-0 overflow-x-auto no-scrollbar">
               {navigationItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.id;
@@ -108,7 +108,9 @@ export default function Navbar({ activeTab, setActiveTab, onOpenLogin, onOpenReg
                   <button
                     key={item.id}
                     onClick={() => selectTab(item.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    title={item.label}
+                    aria-label={item.label}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                       item.isAdminItem
                         ? isActive
                           ? 'bg-amber-600 text-white shadow-xs'
@@ -119,13 +121,13 @@ export default function Navbar({ activeTab, setActiveTab, onOpenLogin, onOpenReg
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5" />
-                    <span>{item.label}</span>
+                    <span className="hidden xl:inline">{item.label}</span>
                   </button>
                 );
               })}
             </nav>
           ) : (
-            <div className="hidden md:flex items-center gap-3">
+            <div className="hidden lg:flex items-center gap-3 shrink-0">
               <button
                 onClick={onOpenLogin}
                 className="px-4 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -148,7 +150,7 @@ export default function Navbar({ activeTab, setActiveTab, onOpenLogin, onOpenReg
             {isAuthenticated && (
               <div 
                 title={`Current Streak: ${metrics.currentStreak} days`}
-                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-800 dark:text-amber-300 text-xs font-semibold"
+                className="hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-800 dark:text-amber-300 text-xs font-semibold"
               >
                 <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
                 <span>{metrics.currentStreak} {t('day')}</span>
@@ -175,7 +177,7 @@ export default function Navbar({ activeTab, setActiveTab, onOpenLogin, onOpenReg
               className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
               <Globe className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span className="hidden sm:inline">{language === 'en' ? 'العربية' : 'EN'}</span>
+              <span className="hidden 2xl:inline">{language === 'en' ? 'العربية' : 'EN'}</span>
             </button>
 
             {/* Dark Mode Toggle */}
@@ -191,7 +193,7 @@ export default function Navbar({ activeTab, setActiveTab, onOpenLogin, onOpenReg
             {/* User Account / Logout */}
             {isAuthenticated ? (
               <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 pl-0.5 sm:pl-1 rtl:pl-0 rtl:pr-0.5 sm:rtl:pr-1">
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 hidden lg:inline truncate max-w-[120px]">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200 hidden 2xl:inline truncate max-w-[110px]">
                   {currentUser.fullName}
                 </span>
                 <button
@@ -211,7 +213,7 @@ export default function Navbar({ activeTab, setActiveTab, onOpenLogin, onOpenReg
                 aria-label={language === 'ar' ? 'فتح قائمة التنقل' : 'Open navigation menu'}
                 aria-expanded={mobileMenuOpen}
                 aria-controls="mobile-navigation-drawer"
-                className="md:hidden p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="lg:hidden p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <Menu className="w-5 h-5" />
               </button>
@@ -223,7 +225,7 @@ export default function Navbar({ activeTab, setActiveTab, onOpenLogin, onOpenReg
 
         {/* Mobile authentication actions for visitors */}
         {!isAuthenticated && (
-          <div className="md:hidden flex items-center gap-2 py-2 border-t border-slate-200/80 dark:border-slate-800">
+          <div className="lg:hidden flex items-center gap-2 py-2 border-t border-slate-200/80 dark:border-slate-800">
             <button
               onClick={onOpenLogin}
               className="flex-1 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
@@ -245,7 +247,7 @@ export default function Navbar({ activeTab, setActiveTab, onOpenLogin, onOpenReg
     {/* Mobile slide-in navigation drawer */}
       {isAuthenticated && (
         <div
-          className="md:hidden fixed inset-0 z-50"
+          className="lg:hidden fixed inset-0 z-50"
           inert={!mobileMenuOpen}
         >
           <div
