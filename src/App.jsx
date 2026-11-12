@@ -154,8 +154,8 @@ function AppContent() {
       />
 
       {/* Universal Footer */}
-      <footer className="mt-auto border-t border-slate-200 dark:border-slate-800/80 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xs py-6">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
+      <footer className="mt-auto border-t border-slate-200 dark:border-slate-800/80 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xs py-4 sm:py-6">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-3 sm:space-y-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-400">
             <div className="flex items-center gap-2">
               <span className="font-bold text-slate-700 dark:text-slate-300">
@@ -175,20 +175,24 @@ function AppContent() {
               <span className="font-semibold text-slate-700 dark:text-slate-300">{t('supportTitle')}:</span>
               <a 
                 href="mailto:bellomuhyideen0001@gmail.com?subject=THABAT%20Inquiry"
+                title="bellomuhyideen0001@gmail.com"
                 className="hover:text-emerald-600 dark:hover:text-emerald-400 underline underline-offset-2 flex items-center gap-1 min-w-0"
               >
                 <Mail className="w-3 h-3 text-emerald-600 shrink-0" />
-                <span className="break-all">bellomuhyideen0001@gmail.com</span>
+                <span className="sm:hidden">{t('supportEmailShort')}</span>
+                <span className="hidden sm:inline break-all">bellomuhyideen0001@gmail.com</span>
               </a>
-              <span>•</span>
+              <span className="hidden sm:inline">•</span>
               <a 
                 href="https://wa.me/2349164028709?text=Assalamu%20Alaikum%2C%20I%20need%20support%20with%20THAB%C4%80T."
                 target="_blank"
                 rel="noopener noreferrer"
+                title="+234 916 402 8709"
                 className="hover:text-emerald-600 dark:hover:text-emerald-400 underline underline-offset-2 flex items-center gap-1"
               >
                 <Phone className="w-3 h-3 text-[#25D366]" />
-                <span>+234 916 402 8709</span>
+                <span className="sm:hidden">{t('supportWhatsappShort')}</span>
+                <span className="hidden sm:inline">+234 916 402 8709</span>
               </a>
             </div>
 
