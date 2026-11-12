@@ -14,7 +14,7 @@ const CertificateSchema = new mongoose.Schema({
   gradeTitleEn: { type: String, required: true },
   gradeTitleAr: { type: String, required: true },
   directorNameEn: { type: String, default: "Bello Muhyideen" },
-  directorNameAr: { type: String, default: "بَلُّو محي الدين" },
+  directorNameAr: { type: String, default: "بَلُّو محيي الدين" },
   signatureTitleEn: { type: String, default: "Programme Director & Founder" },
   signatureTitleAr: { type: String, default: "مدير البرنامج والمؤسس" },
   signatureImage: { type: String, default: "" },

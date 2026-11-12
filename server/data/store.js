@@ -33,7 +33,7 @@ let database = {
     descriptorEn: "90-Day Qur'an Revision Programme",
     descriptorAr: "برنامج مراجعة القرآن الكريم في 90 يوماً",
     directorNameEn: "Bello Muhyideen",
-    directorNameAr: "بَلُّو محي الدين",
+    directorNameAr: "بَلُّو محيي الدين",
     signatureTitleEn: "Programme Director & Founder",
     signatureTitleAr: "مدير البرنامج والمؤسس",
     signatureImage: "",
@@ -165,11 +165,11 @@ async function syncFromMongo() {
  *    templates display (issue date alone does not show the programme period).
  */
 function normalizeLegacyCertificateData() {
-  const LEGACY_DIRECTOR_AR = "بيلو محي الدين";
-  const CORRECT_DIRECTOR_AR = "بَلُّو محي الدين";
+  const LEGACY_DIRECTOR_AR_NAMES = ["بيلو محي الدين", "بَلُّو محي الدين"];
+  const CORRECT_DIRECTOR_AR = "بَلُّو محيي الدين";
   let changed = false;
 
-  if (database.settings?.directorNameAr === LEGACY_DIRECTOR_AR) {
+  if (LEGACY_DIRECTOR_AR_NAMES.includes(database.settings?.directorNameAr)) {
     database.settings.directorNameAr = CORRECT_DIRECTOR_AR;
     changed = true;
 
@@ -181,7 +181,7 @@ function normalizeLegacyCertificateData() {
   (database.certificates || []).forEach(certificate => {
     const updates = {};
 
-    if (certificate.directorNameAr === LEGACY_DIRECTOR_AR) {
+    if (LEGACY_DIRECTOR_AR_NAMES.includes(certificate.directorNameAr)) {
       updates.directorNameAr = CORRECT_DIRECTOR_AR;
     }
 

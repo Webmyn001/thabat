@@ -8,7 +8,7 @@ const SettingSchema = new mongoose.Schema({
   descriptorEn: { type: String, default: "90-Day Qur'an Revision Programme" },
   descriptorAr: { type: String, default: "برنامج مراجعة القرآن الكريم في 90 يوماً" },
   directorNameEn: { type: String, default: "Bello Muhyideen" },
-  directorNameAr: { type: String, default: "بَلُّو محي الدين" },
+  directorNameAr: { type: String, default: "بَلُّو محيي الدين" },
   signatureTitleEn: { type: String, default: "Programme Director & Founder" },
   signatureTitleAr: { type: String, default: "مدير البرنامج والمؤسس" },
   signatureImage: { type: String, default: "" },
