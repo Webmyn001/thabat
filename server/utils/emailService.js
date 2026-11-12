@@ -1,13 +1,30 @@
 /**
- * THABĀT — Email Service (Brevo SMTP via Nodemailer + Resend Fallback)
+ * THABĀT — Email Service (Brevo API + SMTP + Resend fallback)
  * Sends branded, bilingual 6-digit verification codes to participants.
+ *
+ * Render's free web services block outbound SMTP ports 25/465/587, so the
+ * Brevo HTTPS API is preferred whenever BREVO_API_KEY is configured.
  */
 
 import '../config/env.js';
 import nodemailer from 'nodemailer';
 import { Resend } from 'resend';
 
-// 1. Initialize Brevo / SMTP Transporter
+const SENDER_NAME = 'THABĀT | ثبات';
+const HOSTED_ON_RENDER = !!process.env.RENDER;
+
+function extractEmailAddress(value) {
+  const match = value.match(/<([^>]+)>/);
+  return (match ? match[1] : value).trim();
+}
+
+// 1. Initialize Brevo transactional API client
+const brevoApiKey = process.env.BREVO_API_KEY;
+if (brevoApiKey) {
+  console.log('✔ [Email Service] Initialized Brevo HTTPS API');
+}
+
+// 2. Initialize Brevo / SMTP Transporter
 let smtpTransporter = null;
 const brevoKey = process.env.BREVO_SMTP_KEY || process.env.SMTP_PASS;
 const brevoUser = process.env.BREVO_SMTP_USER || process.env.SMTP_USER;
@@ -24,12 +41,19 @@ if (brevoKey && brevoUser) {
       user: brevoUser,
       pass: brevoKey,
     },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000
   });
 
-  console.log(`✔ [Email Service] Initialized Brevo SMTP via ${host}:${port} (${brevoUser})`);
+  if (HOSTED_ON_RENDER) {
+    console.warn('⚠ [Email Service] SMTP is skipped on Render (outbound SMTP ports are blocked). Set BREVO_API_KEY.');
+  } else {
+    console.log(`✔ [Email Service] Initialized Brevo SMTP via ${host}:${port} (${brevoUser})`);
+  }
 }
 
-// 2. Initialize Resend Client (optional fallback)
+// 3. Initialize Resend Client (optional fallback)
 let resendClient = null;
 if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.startsWith('re_')) {
   resendClient = new Resend(process.env.RESEND_API_KEY);
@@ -169,11 +193,49 @@ export async function sendVerificationOtpEmail({ toEmail, fullName, otpCode, lan
 </html>
   `;
 
-  // Log the dispatch without exposing the OTP code in server logs.
-  console.log(`\n[EMAIL DISPATCH] To: ${cleanEmail} | Subject: ${subject}\n`);
+  // Log the dispatch without exposing the OTP code (the subject contains it).
+  console.log(`\n[EMAIL DISPATCH] To: ${cleanEmail} | Purpose: ${purpose}\n`);
 
-  // 1. Try Brevo SMTP first
-  if (smtpTransporter) {
+  const senderAddress = extractEmailAddress(fromEmail);
+  const canUseSmtp = !HOSTED_ON_RENDER;
+
+  // 1. Try the Brevo HTTPS API first (required on Render).
+  if (brevoApiKey) {
+    try {
+      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': brevoApiKey,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          sender: { name: SENDER_NAME, email: senderAddress },
+          replyTo: { email: senderAddress },
+          to: [{ email: cleanEmail, name: cleanName }],
+          subject,
+          htmlContent
+        }),
+        signal: AbortSignal.timeout(20000)
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.message || `Brevo API responded with HTTP ${res.status}`);
+      }
+
+      console.log(`✔ [Brevo API] Email successfully dispatched to ${cleanEmail}. Message ID: ${data.messageId || 'n/a'}`);
+      return { success: true, id: data.messageId, provider: 'brevo-api' };
+    } catch (err) {
+      console.error(`✖ [Brevo API Error] Failed to send email to ${cleanEmail}:`, err.message || err);
+      if (!smtpTransporter && !resendClient) {
+        return { success: false, error: err.message || 'Brevo API delivery failed' };
+      }
+    }
+  }
+
+  // 2. Try Brevo SMTP (local development; blocked on Render free services).
+  if (smtpTransporter && canUseSmtp) {
     try {
       const info = await smtpTransporter.sendMail({
         from: fromEmail,
@@ -194,7 +256,7 @@ export async function sendVerificationOtpEmail({ toEmail, fullName, otpCode, lan
     }
   }
 
-  // 2. Try Resend if configured
+  // 3. Try Resend if configured
   if (resendClient) {
     try {
       const response = await resendClient.emails.send({
@@ -217,11 +279,19 @@ export async function sendVerificationOtpEmail({ toEmail, fullName, otpCode, lan
     }
   }
 
-  // 3. No provider configured: this is a configuration error, not a success.
-  console.error('✖ [Email Service] No live SMTP or Resend credentials configured. Cannot deliver OTP email.');
+  // 4. No usable provider: this is a configuration error, not a success.
+  if (HOSTED_ON_RENDER && smtpTransporter) {
+    console.error('✖ [Email Service] SMTP is blocked on Render. Add BREVO_API_KEY to the backend environment.');
+    return {
+      success: false,
+      error: 'Email delivery is not configured for production. Add BREVO_API_KEY to the backend environment.'
+    };
+  }
+
+  console.error('✖ [Email Service] No live SMTP, Brevo API, or Resend credentials configured. Cannot deliver OTP email.');
   return {
     success: false,
-    error: 'No email provider is configured. Set BREVO_SMTP_* or RESEND_API_KEY in server/.env.'
+    error: 'No email provider is configured. Set BREVO_API_KEY, BREVO_SMTP_*, or RESEND_API_KEY.'
   };
 }
 
