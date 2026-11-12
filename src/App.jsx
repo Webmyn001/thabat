@@ -28,6 +28,16 @@ function AppContent() {
 
   // URL Hash & Query routing (e.g. #admin, ?tab=admin)
   React.useEffect(() => {
+    if (loading) return undefined;
+
+    const PROTECTED_TABS = ['dashboard', 'progress', 'history', 'certificate', 'settings', 'admin'];
+
+    const clearDeepLink = () => {
+      if (window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    };
+
     const handleUrlRouting = () => {
       const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
       const params = new URLSearchParams(window.location.search);
@@ -35,26 +45,48 @@ function AppContent() {
       const target = tabParam || hash;
 
       const validTabs = ['landing', 'dashboard', 'progress', 'history', 'certificate', 'settings', 'admin'];
-      if (validTabs.includes(target)) {
+      if (!validTabs.includes(target)) return;
+
+      // Never leave a signed-out visitor on a protected hash: render the
+      // landing page and ask them to sign in instead of an empty main area.
+      if (PROTECTED_TABS.includes(target) && !isAuthenticated) {
+        setActiveTab('landing');
+        clearDeepLink();
         if (target === 'admin') {
-          if (!isAuthenticated) {
-            setAuthModalOpen(false);
-            setAdminAuthOpen(true);
-          } else if (isAdmin) {
-            setActiveTab('admin');
-          } else {
-            setActiveTab('dashboard');
-          }
+          setAuthModalOpen(false);
+          setAdminAuthOpen(true);
         } else {
-          setActiveTab(target);
+          setAuthModalMode('login');
+          setAdminAuthOpen(false);
+          setAuthModalOpen(true);
         }
+        return;
+      }
+
+      if (target === 'admin') {
+        setActiveTab(isAdmin ? 'admin' : 'dashboard');
+      } else {
+        setActiveTab(target);
       }
     };
 
     handleUrlRouting();
     window.addEventListener('hashchange', handleUrlRouting);
     return () => window.removeEventListener('hashchange', handleUrlRouting);
-  }, [isAuthenticated, isAdmin]);
+  }, [isAuthenticated, isAdmin, loading]);
+
+  // If the session expires or the participant signs out while on a protected
+  // tab, fall back to the landing page and drop the stale deep link.
+  React.useEffect(() => {
+    if (loading || isAuthenticated) return;
+    const protectedTabs = ['dashboard', 'progress', 'history', 'certificate', 'settings', 'admin'];
+    if (protectedTabs.includes(activeTab)) {
+      setActiveTab('landing');
+      if (window.location.hash) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    }
+  }, [loading, isAuthenticated, activeTab]);
 
   // Sync hash with active tab
   React.useEffect(() => {
@@ -69,7 +101,7 @@ function AppContent() {
   React.useEffect(() => {
     if (isAuthenticated) {
       const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
-      const deepLinkedTabs = ['dashboard', 'progress', 'history', 'certificate', 'settings'];
+      const deepLinkedTabs = ['dashboard', 'progress', 'history', 'certificate', 'settings', 'admin'];
 
       if (hash === 'admin' && isAdmin) {
         setActiveTab('admin');
