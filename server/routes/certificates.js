@@ -10,6 +10,41 @@ import {
 
 const router = express.Router();
 
+function latestCompletedDate(userId) {
+  const completedDates = store
+    .find('sessionLogs', s => s.userId === userId && s.isCompleted && s.completedDate)
+    .map(s => s.completedDate)
+    .sort();
+
+  return completedDates[completedDates.length - 1] || "";
+}
+
+/**
+ * Older certificates only stored the issue date. Backfill the programme period
+ * from the participant's enrolment and their last completed session so the
+ * template can always show the actual duration.
+ */
+function ensureCertificateDates(certificate, userId) {
+  if (!certificate) return null;
+
+  const startDate = certificate.startDate
+    || store.findOne('enrolments', e => e.userId === userId)?.startDate
+    || "";
+  const completionDate = certificate.completionDate
+    || latestCompletedDate(userId)
+    || certificate.issueDate;
+
+  if (startDate === (certificate.startDate || "") && completionDate === (certificate.completionDate || "")) {
+    return certificate;
+  }
+
+  return store.update(
+    'certificates',
+    c => c.id === certificate.id,
+    { startDate, completionDate }
+  ) || certificate;
+}
+
 // GET /api/certificates/eligibility
 router.get('/eligibility', authenticateToken, (req, res) => {
   try {
@@ -35,7 +70,10 @@ router.get('/eligibility', authenticateToken, (req, res) => {
     const metrics = calculateScheduleMetrics(enrolment?.startDate, sessionsMap, formatDate(new Date()));
     const scoreInfo = calculateCertificateScore(metrics.totalSessionsCompleted, metrics.missedDaysCount);
 
-    const existingCert = store.findOne('certificates', c => c.userId === userId);
+    const existingCert = ensureCertificateDates(
+      store.findOne('certificates', c => c.userId === userId),
+      userId
+    );
 
     res.json({
       isEligible: scoreInfo.isEligible,
@@ -85,7 +123,10 @@ router.post('/generate', authenticateToken, (req, res) => {
     }
 
     // Check if certificate already exists
-    let certificate = store.findOne('certificates', c => c.userId === userId);
+    let certificate = ensureCertificateDates(
+      store.findOne('certificates', c => c.userId === userId),
+      userId
+    );
     const settings = store.getSettings();
 
     if (!certificate) {
@@ -98,6 +139,8 @@ router.post('/generate', authenticateToken, (req, res) => {
         userId: user.id,
         participantName: user.fullName,
         issueDate: formatDate(new Date()),
+        startDate: enrolment?.startDate || "",
+        completionDate: latestCompletedDate(userId) || formatDate(new Date()),
         totalSessionsCompleted: metrics.totalSessionsCompleted,
         missedDaysCount: metrics.missedDaysCount,
         scorePercent: scoreInfo.scorePercent,

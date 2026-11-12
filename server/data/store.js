@@ -33,7 +33,7 @@ let database = {
     descriptorEn: "90-Day Qur'an Revision Programme",
     descriptorAr: "برنامج مراجعة القرآن الكريم في 90 يوماً",
     directorNameEn: "Bello Muhyideen",
-    directorNameAr: "بيلو محي الدين",
+    directorNameAr: "بَلُّو محي الدين",
     signatureTitleEn: "Programme Director & Founder",
     signatureTitleAr: "مدير البرنامج والمؤسس",
     signatureImage: "",
@@ -88,6 +88,8 @@ export async function initStore() {
         console.warn(`⚠ [Database] MongoDB connection failed (${mongoErr.message}). Using local store fallback.`);
       }
     }
+
+    normalizeLegacyCertificateData();
   } catch (err) {
     console.error("Error initializing store:", err);
     seedDefaultData();
@@ -153,6 +155,64 @@ async function syncFromMongo() {
     console.log(`✔ [Database] Synced collections with MongoDB Atlas (Users: ${database.users.length}, Enrolments: ${database.enrolments.length})`);
   } catch (err) {
     console.error("Error syncing with MongoDB:", err.message);
+  }
+}
+
+/**
+ * Repairs records written by older versions:
+ *  - corrects the director's Arabic name spelling,
+ *  - backfills the programme start / completion dates that new certificate
+ *    templates display (issue date alone does not show the programme period).
+ */
+function normalizeLegacyCertificateData() {
+  const LEGACY_DIRECTOR_AR = "بيلو محي الدين";
+  const CORRECT_DIRECTOR_AR = "بَلُّو محي الدين";
+  let changed = false;
+
+  if (database.settings?.directorNameAr === LEGACY_DIRECTOR_AR) {
+    database.settings.directorNameAr = CORRECT_DIRECTOR_AR;
+    changed = true;
+
+    if (isMongoConnected) {
+      Setting.findOneAndUpdate({}, { directorNameAr: CORRECT_DIRECTOR_AR }).catch(() => {});
+    }
+  }
+
+  (database.certificates || []).forEach(certificate => {
+    const updates = {};
+
+    if (certificate.directorNameAr === LEGACY_DIRECTOR_AR) {
+      updates.directorNameAr = CORRECT_DIRECTOR_AR;
+    }
+
+    if (!certificate.startDate) {
+      const enrolment = database.enrolments.find(e => e.userId === certificate.userId);
+      if (enrolment?.startDate) {
+        updates.startDate = enrolment.startDate;
+      }
+    }
+
+    if (!certificate.completionDate) {
+      const completedDates = database.sessionLogs
+        .filter(s => s.userId === certificate.userId && s.isCompleted && s.completedDate)
+        .map(s => s.completedDate)
+        .sort();
+
+      updates.completionDate = completedDates[completedDates.length - 1] || certificate.issueDate;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      store.update(
+        'certificates',
+        c => c.id === certificate.id || c.certificateNumber === certificate.certificateNumber,
+        updates
+      );
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    saveStore();
   }
 }
 

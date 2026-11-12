@@ -345,6 +345,17 @@ export function formatDisplayDate(dateStr, lang = 'en') {
   });
 }
 
+export function formatCertificateDate(dateStr, lang = 'en') {
+  if (!dateStr) return "";
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const locale = lang === 'ar' ? 'ar-SA' : 'en-GB';
+  return new Date(y, m - 1, d).toLocaleDateString(locale, {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+}
+
 export function getJuzDetails(juzNumbers) {
   return juzNumbers.map(num => {
     return QURAN_JUZ.find(j => j.juz === num) || {

@@ -68,3 +68,24 @@
   background-size: 32px 32px;
   background-position: 0 0, 16px 16px;
 }
+
+/* Certificate export: print only the certificate, on a single landscape A4 page */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .print-area {
+    break-inside: avoid;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

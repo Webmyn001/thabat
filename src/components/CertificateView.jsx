@@ -10,7 +10,7 @@ import {
 import { useAuth, API_BASE } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useProgram } from '../context/ProgramContext';
-import { formatDisplayDate } from '../utils/scheduleEngine.js';
+import { formatCertificateDate } from '../utils/scheduleEngine.js';
 import thabatLogo from '../assets/thabat-logo.png';
 
 export default function CertificateView() {
@@ -100,10 +100,10 @@ export default function CertificateView() {
   const remainingSessions = Math.max(0, (metrics.totalSessionsTarget || 180) - metrics.totalSessionsCompleted);
 
   return (
-    <div className="space-y-8 pb-16">
+    <div className="space-y-8 pb-16 print:space-y-0 print:pb-0">
       
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white flex items-center gap-2">
             <Award className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
@@ -111,8 +111,8 @@ export default function CertificateView() {
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
             {language === 'ar' 
-              ? "شهادة رسمية توثق إتمام متطلبات برنامج ثبات الـ 90 يوماً ومعدل المواظبة والدرجة المكتسبة."
-              : "Official certificate verifying 90-day programme completion, consistency score, and distinction honour."}
+              ? "شهادة رسمية توثق إتمام متطلبات برنامج ثبات الـ 90 يوماً ومعدل المواظبة والتقدير النهائي."
+              : "Official certificate confirming completion of the 90-day programme, your consistency score, and your final grade."}
           </p>
         </div>
 
@@ -128,6 +128,7 @@ export default function CertificateView() {
 
             <button
               onClick={handlePrint}
+              title={language === 'ar' ? 'اختر «حفظ بصيغة PDF» في نافذة الطباعة' : "Choose 'Save as PDF' in the print dialog"}
               className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md flex items-center gap-2 transition-colors"
             >
               <Printer className="w-4 h-4" />
@@ -139,7 +140,7 @@ export default function CertificateView() {
 
       {/* Administrator-only template preview notice */}
       {isAdmin && isPreview && (
-        <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 text-xs sm:text-sm flex items-start gap-2 max-w-4xl mx-auto">
+        <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 text-xs sm:text-sm flex items-start gap-2 max-w-4xl mx-auto print:hidden">
           <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
           <span>
             <strong>{language === 'ar' ? 'معاينة المشرف:' : 'Administrator Preview:'}</strong>{' '}
@@ -152,7 +153,7 @@ export default function CertificateView() {
 
       {/* Ineligible State Card */}
       {!isEligible && (
-        <div className="p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm text-center max-w-2xl mx-auto space-y-5">
+        <div className="p-8 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm text-center max-w-2xl mx-auto space-y-5 print:hidden">
           <div className="w-16 h-16 rounded-3xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 flex items-center justify-center mx-auto shadow-xs">
             <Lock className="w-8 h-8" />
           </div>
@@ -187,7 +188,7 @@ export default function CertificateView() {
 
       {/* Eligible but Not Generated Yet */}
       {isEligible && !certificate && (
-        <div className="p-8 rounded-3xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 text-center max-w-xl mx-auto space-y-4">
+        <div className="p-8 rounded-3xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 text-center max-w-xl mx-auto space-y-4 print:hidden">
           <div className="w-16 h-16 rounded-3xl bg-emerald-600 text-white flex items-center justify-center mx-auto shadow-md">
             <Sparkles className="w-8 h-8" />
           </div>
@@ -198,8 +199,8 @@ export default function CertificateView() {
 
           <p className="text-xs sm:text-sm text-emerald-800 dark:text-emerald-200 leading-relaxed">
             {language === 'ar'
-              ? `لقد أتممت كافة أوراد البرنامج الـ 180 كاملاً بنسبة إنجاز 100% وختمت القرآن 18 ختمة كاملة. معدل التزامك المحتسب: ${eligibilityData?.scorePercent || 100}% (${eligibilityData?.gradeTitleAr || 'ممتاز'}).`
-              : `You have successfully completed all 180 sessions with 100% completion and finished the Qur'an 18 complete times. Consistency score: ${eligibilityData?.scorePercent || 100}% (${eligibilityData?.gradeTitleEn || 'Distinction'}).`}
+              ? `لقد أتممت كافة أوراد البرنامج الـ 180 كاملاً بنسبة إنجاز 100%، وأتممت ثماني عشرة ختمة كاملة للقرآن الكريم. معدل التزامك المحتسب: ${eligibilityData?.scorePercent || 100}% (${eligibilityData?.gradeTitleAr || 'ممتاز'}).`
+              : `You have completed all 180 sessions with 100% completion and eighteen full readings of the Qur'an. Consistency score: ${eligibilityData?.scorePercent || 100}% (${eligibilityData?.gradeTitleEn || 'Distinction'}).`}
           </p>
 
           <button
@@ -214,84 +215,99 @@ export default function CertificateView() {
 
       {/* Printable Certificate Template */}
       {certificate && (
-        <div className="print-area max-w-4xl mx-auto bg-white text-slate-900 p-3 sm:p-14 rounded-3xl shadow-2xl border-4 sm:border-8 border-emerald-800/20 relative overflow-hidden">
+        <div className="print-area max-w-4xl mx-auto bg-white text-slate-900 p-3 sm:p-14 rounded-3xl shadow-2xl border-4 sm:border-8 border-emerald-800/20 relative overflow-hidden print:max-w-none print:p-6 print:mx-0 print:rounded-none print:shadow-none print:overflow-visible">
           
           {/* Ornate Islamic Border Frame */}
-          <div className="border-2 sm:border-4 border-emerald-700 p-3 sm:p-10 rounded-2xl relative">
+          <div className="border-2 sm:border-4 border-emerald-700 p-3 sm:p-10 print:p-6 rounded-2xl relative">
             <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-amber-500" />
             <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-amber-500" />
             <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-amber-500" />
             <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-amber-500" />
 
             {/* Header / Bismillah */}
-            <div className="text-center space-y-3 mb-6">
+            <div className="text-center space-y-3 mb-6 print:space-y-1 print:mb-3">
               {/* Official Emblem */}
-              <div className="flex justify-center mb-1">
-                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden shadow-xl ring-4 ring-emerald-700/30 bg-emerald-950">
+              <div className="flex justify-center">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 print:w-16 print:h-16 rounded-2xl overflow-hidden shadow-xl ring-4 ring-emerald-700/30 bg-emerald-950">
                   <img src={thabatLogo} alt="THABĀT Official Emblem" className="w-full h-full object-cover" />
                 </div>
               </div>
-              <div className="font-arabic text-xl sm:text-2xl font-bold text-emerald-800">
+              <div className="font-arabic text-xl sm:text-2xl print:text-xl font-bold text-emerald-800 pt-4 print:pt-2">
                 بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
               </div>
               <div className="text-xs uppercase tracking-widest text-slate-400 font-bold">
-                THABĀT | 90-DAY QUR'AN REVISION PROGRAMME
+                {certLanguage === 'ar' ? 'ثبات | برنامج مراجعة القرآن الكريم لمدة 90 يوماً' : "THABĀT | 90-DAY QUR'AN REVISION PROGRAMME"}
               </div>
-              <h2 className="text-2xl sm:text-4xl font-black text-emerald-900 font-arabic tracking-tight pt-1">
+              <h2 className="text-2xl sm:text-4xl print:text-3xl font-black text-emerald-900 font-arabic tracking-tight pt-1 print:pt-0">
                 {certLanguage === 'ar' ? "شهادة إتمام برنامج مراجعة القرآن الكريم" : "Certificate of Programme Completion"}
               </h2>
             </div>
 
             {/* Recipient Statement */}
-            <div className="text-center my-6 space-y-3">
+            <div className="text-center my-6 space-y-3 print:my-3 print:space-y-1">
               <p className="text-xs sm:text-sm text-slate-500 uppercase tracking-wider font-semibold">
-                {certLanguage === 'ar' ? "تَشْهَدُ إِدَارَةُ بَرْنَامَجِ ثَبَاتٍ بِأَنَّ الحَافِظَ / الحَافِظَةَ:" : "This certifies that the Hafidh:"}
+                {certLanguage === 'ar' ? "تَشْهَدُ إِدَارَةُ بَرْنَامَجِ ثَبَاتٍ بِأَنَّ الحَافِظَ / الحَافِظَةَ:" : "This is to certify that the Hafidh / Hafidhah:"}
               </p>
               
-              <div className="text-xl sm:text-4xl font-extrabold text-emerald-800 border-b-2 border-emerald-600/30 inline-block px-3 sm:px-8 py-2 break-words max-w-full">
+              <div className="text-xl sm:text-4xl print:text-3xl font-extrabold text-emerald-800 border-b-2 border-emerald-600/30 inline-block px-3 sm:px-8 py-2 print:py-1 break-words max-w-full">
                 {certificate.participantName}
               </div>
 
-              <p className="text-xs sm:text-base text-slate-700 max-w-2xl mx-auto leading-relaxed pt-2">
+              <p className="text-xs sm:text-base print:text-sm text-slate-700 max-w-2xl mx-auto leading-relaxed pt-2 print:pt-1">
                 {certLanguage === 'ar' ? (
                   <span>
-                    قد أتمّ بنجاح ومواظبة تامة برنامج «ثبات» لمراجعة القرآن الكريم كاملاً في <strong>90 يوماً</strong>، مستكملاً <strong>180 ورداً قرآنيّاً</strong> عبر مراحله الخمس، متوجاً ذلك بـ <strong>ثمانية عشر ختمة كاملة</strong> لكتاب الله تعالى، ترسيخاً للحفظ وتثبيتاً للآيات في الصدر.
+                    قد أتمّ بنجاح ومواظبة تامة برنامج «ثبات» لمراجعة القرآن الكريم كاملاً في <strong>90 يوماً</strong>، مستكملاً <strong>180 ورداً قرآنيّاً</strong> عبر مراحله الخمس، ومختتماً بإتمام <strong>ثماني عشرة ختمة كاملة</strong> لكتاب الله تعالى، ترسيخاً للحفظ وتثبيتاً للآيات في الصدور.
                   </span>
                 ) : (
                   <span>
-                    has diligently and faithfully completed the <strong>90-Day Thabāt Qur'an Revision Programme</strong>, successfully completing all <strong>180 required sessions</strong> across its 5 phases, culminating in <strong>18 complete readings of the Noble Qur'an</strong> to firmly anchor the memorisation.
+                    has diligently and consistently completed the <strong>90-Day Thabāt Qur'an Revision Programme</strong>, successfully completing all <strong>180 required sessions</strong> across its five phases and culminating in <strong>eighteen complete readings of the Noble Qur'an</strong> to firmly anchor the memorisation.
                   </span>
                 )}
+              </p>
+
+              <p className="text-[11px] sm:text-xs text-slate-500 font-semibold pt-1 print:pt-0.5">
+                {certificate.startDate && certificate.completionDate && (
+                  <>
+                    {certLanguage === 'ar' ? 'مدة البرنامج: ' : 'Programme period: '}
+                    {formatCertificateDate(certificate.startDate, certLanguage)}
+                    {' — '}
+                    {formatCertificateDate(certificate.completionDate, certLanguage)}
+                    {' • '}
+                  </>
+                )}
+                {certLanguage === 'ar' ? 'تاريخ الإصدار: ' : 'Issued: '}
+                {formatCertificateDate(certificate.issueDate, certLanguage)}
               </p>
             </div>
 
             {/* Score & Distinction Metric (As requested by user) */}
-            <div className="my-8 p-4 rounded-xl bg-emerald-50/70 border border-emerald-200/80 max-w-xl mx-auto flex flex-wrap items-center justify-center gap-4 text-center text-xs">
+            <div className="my-8 p-4 print:my-3 print:p-3 rounded-xl bg-emerald-50/70 border border-emerald-200/80 max-w-xl mx-auto flex flex-wrap items-center justify-center gap-4 text-center text-xs">
               <div>
-                <span className="text-slate-400 uppercase font-bold text-[10px] block">{t('certScore')}</span>
+                <span className="text-slate-400 uppercase font-bold text-[10px] block">{certLanguage === 'ar' ? 'معدل الانتظام والمواظبة' : 'Consistency Score'}</span>
                 <span className="text-2xl font-black text-emerald-800">{certificate.scorePercent}%</span>
               </div>
               <div className="hidden sm:block w-px h-8 bg-emerald-200" />
               <div>
-                <span className="text-slate-400 uppercase font-bold text-[10px] block">{t('certGrade')}</span>
+                <span className="text-slate-400 uppercase font-bold text-[10px] block">{certLanguage === 'ar' ? 'التقدير العام' : 'Graduation Honour'}</span>
                 <span className="text-sm sm:text-base font-extrabold text-emerald-900">
                   {certLanguage === 'ar' ? certificate.gradeTitleAr : certificate.gradeTitleEn}
                 </span>
               </div>
               <div className="hidden sm:block w-px h-8 bg-emerald-200" />
               <div>
-                <span className="text-slate-400 uppercase font-bold text-[10px] block">{t('missedDays')}</span>
+                <span className="text-slate-400 uppercase font-bold text-[10px] block">{certLanguage === 'ar' ? 'الأيام الفائتة' : 'Missed Days'}</span>
                 <span className="text-sm font-bold text-slate-700">{certificate.missedDaysCount}</span>
               </div>
             </div>
 
             {/* Signatures & Footer details */}
-            <div className="mt-10 pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-6 text-xs text-slate-600">
+            <div className="mt-10 pt-6 print:mt-5 print:pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-6 text-xs text-slate-600">
               
               <div className="space-y-1 text-center sm:text-left rtl:sm:text-right">
-                <div className="font-bold text-slate-800 break-all">{t('certNumber')}: <span className="font-mono text-emerald-800">{certificate.certificateNumber}</span></div>
-                <div>{t('issueDate')}: {formatDisplayDate(certificate.issueDate, certLanguage)}</div>
-                <div className="text-[10px] text-slate-400">Verified by Thabāt Cryptographic Registry</div>
+                <div className="font-bold text-slate-800 break-all">{certLanguage === 'ar' ? 'رقم الشهادة' : 'Certificate ID'}: <span className="font-mono text-emerald-800">{certificate.certificateNumber}</span></div>
+                <div className="text-[10px] text-slate-400">
+                  {certLanguage === 'ar' ? 'مسجّلة في سجل شهادات ثبات' : 'Recorded in the Thabāt Certificate Registry'}
+                </div>
               </div>
 
               {/* Official Seal – Thabāt Emblem */}

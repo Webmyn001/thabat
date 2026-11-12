@@ -112,7 +112,6 @@ export default function AdminAuthModal({ isOpen, onClose, onSuccess, onSwitchToP
       setOtp('');
       setNewPassword('');
       setConfirmPassword('');
-      setDevOtp('');
     } catch (err) {
       setErrorMsg(err.message || tr('Failed to reset password.', 'فشل إعادة تعيين كلمة المرور.'));
     } finally {

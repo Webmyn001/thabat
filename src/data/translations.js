@@ -177,7 +177,7 @@ export const TRANSLATIONS = {
     certNumber: "Certificate ID",
     issueDate: "Issue Date",
     director: "Programme Director",
-    btnDownloadPdf: "Download Certificate (PDF / Print)",
+    btnDownloadPdf: "Download PDF",
     
     // Admin
     adminTitle: "Thabāt Administrative Console",
@@ -332,7 +332,7 @@ export const TRANSLATIONS = {
     streak: "التتابع",
     sessionsCompleted: "الأوراد المنجزة",
     daysCompleted: "الأيام المكتملة",
-    missedDays: "الأيام المتأخرة",
+    missedDays: "الأيام الفائتة",
     originalDeadline: "الموعد الأصلي",
     revisedDeadline: "الموعد المعدل",
     activeRevisionCard: "ورد المراجعة المستحق اليوم",
@@ -383,14 +383,14 @@ export const TRANSLATIONS = {
     // Certificate
     certTitle: "شهادة إتمام برنامج مراجعة القرآن الكريم",
     certIneligibleTitle: "الشهادة غير متاحة حالياً",
-    certIneligibleDesc: "للحصول على شهادة ثبات المعتمدة، يجب إتمام كافة أيام البرنامج الـ 90 (120 ورداً كاملاً).",
+    certIneligibleDesc: "للحصول على شهادة ثبات المعتمدة، يجب إتمام كافة أيام البرنامج الـ 90 (180 ورداً كاملاً).",
     sessionsLeft: "أوراد متبقية للإتمام",
     certScore: "معدل الانتظام والمواظبة",
     certGrade: "التقدير العام",
     certNumber: "رقم الشهادة المعتمد",
     issueDate: "تاريخ الإصدار",
     director: "مدير البرنامج ومؤسس المنصة",
-    btnDownloadPdf: "تحميل الشهادة (طباعة / PDF)",
+    btnDownloadPdf: "تحميل الشهادة PDF",
     
     // Admin
     adminTitle: "لوحة التحكم الإدارية لمنصة ثبات",

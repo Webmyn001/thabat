@@ -204,7 +204,6 @@ export default function AdminDashboard({ setActiveTab }) {
       setPwOtp('');
       setPwNew('');
       setPwConfirm('');
-      setPwDevOtp('');
       if (refreshUser) await refreshUser();
     } catch (err) {
       setPwError(err.message || "Failed to change password.");

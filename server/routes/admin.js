@@ -181,12 +181,19 @@ router.get('/certificate-preview', (req, res) => {
     const admin = store.findOne('users', u => u.id === req.user.id);
     const scoreInfo = calculateCertificateScore(TOTAL_PROGRAM_SESSIONS, 0);
 
+    const adminEnrolment = store.findOne('enrolments', e => e.userId === req.user.id);
+    const today = formatDate(new Date());
+    const previewStartDate = adminEnrolment?.startDate
+      || formatDate(new Date(Date.now() - 89 * 24 * 60 * 60 * 1000));
+
     const previewCertificate = {
       id: "admin_preview",
       certificateNumber: `THB-PREVIEW-${new Date().getFullYear()}`,
       userId: req.user.id,
       participantName: admin?.fullName || req.user.fullName,
-      issueDate: formatDate(new Date()),
+      issueDate: today,
+      startDate: previewStartDate,
+      completionDate: today,
       totalSessionsCompleted: TOTAL_PROGRAM_SESSIONS,
       missedDaysCount: 0,
       scorePercent: scoreInfo.scorePercent,
